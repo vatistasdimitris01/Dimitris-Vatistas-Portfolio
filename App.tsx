@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabaseClient';
-import { ExternalLinkIcon, SunIcon, MoonIcon, CommandIcon, XIcon, InstagramIcon, StarIcon } from './components/Icons';
+import { SunIcon, MoonIcon, CommandIcon, XIcon, InstagramIcon, StarIcon } from './components/Icons';
 import { marked } from 'marked';
 
 // --- HELPERS ---
@@ -26,9 +27,13 @@ type Project = {
     id: string;
     created_at: string;
     title: string;
-    description: string;
     url: string;
     is_featured: boolean;
+    slug: string;
+    content?: string;
+    goals_challenges?: string;
+    outcome?: string;
+    tech_stack?: string[];
 };
 
 type BlogPost = {
@@ -37,9 +42,9 @@ type BlogPost = {
     title: string;
     summary: string;
     slug: string;
-    url: string;
-    image_url: string;
-    content: string;
+    url?: string;
+    image_url?: string;
+    content?: string;
     is_featured: boolean;
 };
 
@@ -77,27 +82,27 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title
 
 const RecentProjects: React.FC<{ projects: Project[] }> = ({ projects }) => (
     <Section title="Recent Projects">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="space-y-6">
             {projects.length > 0 ? projects.map((project) => (
                 <a 
-                    href={project.url} 
+                    href={`/#/project/${project.slug}`} 
                     key={project.id} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="group flex flex-col justify-between p-6 bg-gray-50/50 dark:bg-zinc-900/80 border border-gray-100/80 dark:border-zinc-800 rounded-lg hover:shadow-md transition-shadow"
+                    className="group block p-6 bg-gray-50/50 dark:bg-zinc-900/80 border border-gray-100/80 dark:border-zinc-800 rounded-lg hover:shadow-md transition-shadow"
                 >
-                    <div>
-                        <h3 className="font-semibold text-gray-800 dark:text-gray-200 group-hover:text-black dark:group-hover:text-white">
-                            {project.title}
-                        </h3>
-                        <p className="text-gray-500 dark:text-gray-400 mt-2">{project.description}</p>
-                    </div>
-                    <div className="flex items-center gap-2 mt-4">
-                         <span className="relative flex h-2.5 w-2.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
-                        </span>
-                        <span className="text-xs text-blue-500 dark:text-blue-400 font-medium">Live from GitHub</span>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h3 className="font-semibold text-gray-800 dark:text-gray-200 group-hover:text-black dark:group-hover:text-white">
+                                {project.title}
+                            </h3>
+                            <p className="text-gray-500 dark:text-gray-400 mt-2">{project.outcome?.substring(0, 100)}...</p>
+                        </div>
+                         <div className="flex items-center gap-2 mt-1 flex-shrink-0">
+                             <span className="relative flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500"></span>
+                            </span>
+                            <span className="text-xs text-blue-500 dark:text-blue-400 font-medium">Live</span>
+                        </div>
                     </div>
                 </a>
             )) : <p className="text-gray-500 dark:text-gray-400">No featured projects to display yet. Star a project in the admin panel to feature it here.</p>}
@@ -181,20 +186,22 @@ const Footer: React.FC<{ theme: Theme; setTheme: (theme: Theme) => void }> = ({ 
 // --- PAGES ---
 
 const HomePage: React.FC<{ posts: BlogPost[], projects: Project[] }> = ({ posts, projects }) => (
-    <>
-        <main className="max-w-3xl mx-auto px-6 py-20 md:py-28">
-            <div className="space-y-20">
-                <Header name={name} role={role} bio={bio} />
-                <RecentProjects projects={projects} />
-                <WorkExperience experiences={workExperience} />
-                <Blog posts={posts} />
-                <Connect links={socialLinks} />
-            </div>
-        </main>
-    </>
+    <main className="max-w-3xl mx-auto px-6 py-20 md:py-28">
+        <div className="space-y-20">
+            <Header name={name} role={role} bio={bio} />
+            <RecentProjects projects={projects} />
+            <WorkExperience experiences={workExperience} />
+            <Blog posts={posts} />
+            <Connect links={socialLinks} />
+        </div>
+    </main>
 );
 
-const BlogPostPage: React.FC<{ post: BlogPost; recommendedPosts: BlogPost[]; }> = ({ post, recommendedPosts }) => {
+const PageLayout: React.FC<{children: React.ReactNode}> = ({ children }) => (
+    <main className="max-w-3xl mx-auto px-6 py-16 md:py-24">{children}</main>
+);
+
+const PageHeader: React.FC<{title: string}> = ({ title }) => {
     const [copyButtonText, setCopyButtonText] = useState('Copy URL');
 
     const handleCopyUrl = () => {
@@ -204,60 +211,100 @@ const BlogPostPage: React.FC<{ post: BlogPost; recommendedPosts: BlogPost[]; }> 
         });
     };
 
-    const contentHtml = post.content ? marked.parse(post.content) as string : '';
-
     return (
-        <>
-            <main className="max-w-3xl mx-auto px-6 py-16 md:py-24">
-                 <header className="mb-12">
-                    <div className="flex justify-between items-start">
-                        <a href="/#" className="text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
-                            Dimitris Vatistas
-                        </a>
-                        <button 
-                            onClick={handleCopyUrl} 
-                            className="hidden md:inline-block bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-600 dark:text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors text-sm"
-                        >
-                            {copyButtonText}
-                        </button>
-                    </div>
-                     <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white leading-tight mt-6">
-                        {post.title}
-                    </h1>
-                </header>
-
-                <article className="space-y-8">
-                    {post.image_url && (
-                        <img 
-                            src={post.image_url} 
-                            alt={post.title}
-                            className="w-full h-auto rounded-lg object-cover aspect-video border border-gray-100 dark:border-zinc-800"
-                        />
-                    )}
-                    {post.content ? (
-                      <div className="prose prose-neutral dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: contentHtml }} />
-                    ) : (
-                      <p className="text-gray-500">This post is currently being written. Check back soon!</p>
-                    )}
-                </article>
-
-                 <nav className="mt-16 pt-8 border-t border-gray-100 dark:border-zinc-800 space-y-8">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Further Reading</h2>
-                    <div className="space-y-4">
-                        {recommendedPosts.map(p => (
-                            <a href={`/#/blog/${p.slug}`} key={p.id} className="group block text-gray-800 dark:text-gray-200 hover:text-black dark:hover:text-white transition-colors">
-                                <div className="flex justify-between items-center font-semibold">
-                                    <span>{p.title}</span>
-                                    <span className="transform transition-transform group-hover:translate-x-1">&rarr;</span>
-                                </div>
-                            </a>
-                        ))}
-                    </div>
-                </nav>
-            </main>
-        </>
+        <header className="mb-12">
+            <div className="flex justify-between items-start">
+                <a href="/#" className="text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
+                    Dimitris Vatistas
+                </a>
+                <button 
+                    onClick={handleCopyUrl} 
+                    className="hidden md:inline-block bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-gray-600 dark:text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors text-sm"
+                >
+                    {copyButtonText}
+                </button>
+            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white leading-tight mt-6">
+                {title}
+            </h1>
+        </header>
     );
 };
+
+const MarkdownContent: React.FC<{ content: string | undefined | null }> = ({ content }) => {
+    const html = content ? marked.parse(content) as string : '';
+    return (
+        <div className="prose prose-neutral dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: html }} />
+    );
+};
+
+const FurtherReadingNav: React.FC<{items: Array<{slug: string; title: string; id: string}>; type: 'blog' | 'project'}> = ({ items, type }) => (
+     <nav className="mt-16 pt-8 border-t border-gray-100 dark:border-zinc-800 space-y-8">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Further Reading</h2>
+        <div className="space-y-4">
+            {items.map(p => (
+                <a href={`/#/${type}/${p.slug}`} key={p.id} className="group block text-gray-800 dark:text-gray-200 hover:text-black dark:hover:text-white transition-colors">
+                    <div className="flex justify-between items-center font-semibold">
+                        <span>{p.title}</span>
+                        <span className="transform transition-transform group-hover:translate-x-1">&rarr;</span>
+                    </div>
+                </a>
+            ))}
+        </div>
+    </nav>
+);
+
+const ProjectPage: React.FC<{ project: Project; recommendedProjects: Project[] }> = ({ project, recommendedProjects }) => (
+    <PageLayout>
+        <PageHeader title={project.title} />
+        <article className="space-y-12">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white -mb-8">{project.title}</h2>
+            <MarkdownContent content={project.content} />
+
+            <section>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Goals & Challenges</h3>
+                <MarkdownContent content={project.goals_challenges} />
+            </section>
+
+            <section>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Tech Stack</h3>
+                <ul className="list-disc list-inside space-y-1">
+                    {project.tech_stack?.map(tech => <li key={tech}>{tech}</li>)}
+                </ul>
+            </section>
+
+             <section>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Outcome</h3>
+                <MarkdownContent content={project.outcome} />
+                <a href={project.url} target="_blank" rel="noopener noreferrer" className="inline-block mt-4 font-medium text-blue-600 hover:underline">
+                    View Project &rarr;
+                </a>
+            </section>
+        </article>
+        <FurtherReadingNav items={recommendedProjects} type="project" />
+    </PageLayout>
+);
+
+const BlogPostPage: React.FC<{ post: BlogPost; recommendedPosts: BlogPost[]; }> = ({ post, recommendedPosts }) => (
+    <PageLayout>
+        <PageHeader title={post.title} />
+        <article className="space-y-8">
+            {post.image_url && (
+                <img 
+                    src={post.image_url} 
+                    alt={post.title}
+                    className="w-full h-auto rounded-lg object-cover aspect-video border border-gray-100 dark:border-zinc-800"
+                />
+            )}
+            {post.content ? (
+              <MarkdownContent content={post.content} />
+            ) : (
+              <p className="text-gray-500">This post is currently being written. Check back soon!</p>
+            )}
+        </article>
+        <FurtherReadingNav items={recommendedPosts} type="blog" />
+    </PageLayout>
+);
 
 const LoginPage: React.FC<{ onLogin: (success: boolean) => void }> = ({ onLogin }) => {
     const [password, setPassword] = useState('');
@@ -300,13 +347,13 @@ const LoginPage: React.FC<{ onLogin: (success: boolean) => void }> = ({ onLogin 
 
 // --- ADMIN PAGE & COMPONENTS ---
 type ModalType = 'create-project' | 'edit-project' | 'create-blog' | 'edit-blog' | null;
+type ProjectFormData = Omit<Project, 'id' | 'created_at' | 'is_featured' | 'tech_stack'> & { tech_stack: string };
+type BlogFormData = Omit<BlogPost, 'id' | 'created_at' | 'slug' | 'is_featured'>;
 
 const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
     useEffect(() => {
         const handleEsc = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                onClose();
-            }
+            if (event.key === 'Escape') onClose();
         };
         window.addEventListener('keydown', handleEsc);
         return () => window.removeEventListener('keydown', handleEsc);
@@ -316,32 +363,27 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
 
     return (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
-            <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-4 border-b dark:border-zinc-800">
                     <h2 className="text-xl font-semibold dark:text-white">{title}</h2>
                     <button onClick={onClose} aria-label="Close modal" className="text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
                         <XIcon className="w-6 h-6" />
                     </button>
                 </div>
-                <div className="p-6 overflow-y-auto">
-                    {children}
-                </div>
+                <div className="p-6 overflow-y-auto">{children}</div>
             </div>
         </div>
     );
 };
 
-
 const AdminPage: React.FC<{
-    posts: BlogPost[];
-    refreshPosts: () => void;
-    projects: Project[];
-    refreshProjects: () => void;
+    posts: BlogPost[]; refreshPosts: () => void;
+    projects: Project[]; refreshProjects: () => void;
 }> = ({ posts, refreshPosts, projects, refreshProjects }) => {
     
     // --- State ---
-    const [blogFormData, setBlogFormData] = useState<Omit<BlogPost, 'id' | 'created_at' | 'slug' | 'is_featured'>>({ title: '', summary: '', url: '', image_url: '', content: '' });
-    const [projectFormData, setProjectFormData] = useState<Omit<Project, 'id' | 'created_at' | 'is_featured'>>({ title: '', description: '', url: '' });
+    const [blogFormData, setBlogFormData] = useState<BlogFormData>({ title: '', summary: '', url: '', image_url: '', content: '' });
+    const [projectFormData, setProjectFormData] = useState<ProjectFormData>({ title: '', url: '', slug: '', content: '', goals_challenges: '', outcome: '', tech_stack: '' });
     const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
     const [editingProject, setEditingProject] = useState<Project | null>(null);
     const [jsonProjects, setJsonProjects] = useState('');
@@ -351,36 +393,43 @@ const AdminPage: React.FC<{
     const [copyProjectJsonText, setCopyProjectJsonText] = useState('Copy Example');
     const [copyBlogJsonText, setCopyBlogJsonText] = useState('Copy Example');
     const [activeModal, setActiveModal] = useState<ModalType>(null);
-
+    const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+    const [selectedBlogs, setSelectedBlogs] = useState<string[]>([]);
 
     // --- Effects ---
     useEffect(() => {
         const fetchAnalytics = async () => {
-            // Fetch total visits
-            const { count, error: totalError } = await supabase.from('page_visits').select('*', { count: 'exact', head: true });
-            
-            // Fetch daily visits for the last 7 days
-            const today = new Date();
-            const last7Days = new Date(today);
-            last7Days.setDate(today.getDate() - 7);
-            const { data: dailyData, error: dailyError } = await supabase
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+            const { data, error } = await supabase
                 .from('page_visits')
                 .select('created_at')
-                .gte('created_at', last7Days.toISOString());
+                .gte('created_at', sevenDaysAgo.toISOString())
+                .order('created_at', { ascending: true });
 
-            if (totalError || dailyError) {
-                console.error('Error fetching analytics:', totalError?.message || dailyError?.message);
-            } else {
-                const dailyCounts = Array(7).fill(0);
-                dailyData?.forEach(visit => {
-                    const visitDate = new Date(visit.created_at);
-                    const diffDays = Math.floor((today.getTime() - visitDate.getTime()) / (1000 * 3600 * 24));
-                    if (diffDays >= 0 && diffDays < 7) {
-                        dailyCounts[6 - diffDays]++;
-                    }
-                });
-                setAnalytics({ total: count, daily: dailyCounts });
+            if (error) {
+                console.error("Error fetching analytics:", error);
+                setAnalytics({ total: null, daily: [] });
+                return;
             }
+
+            const { count: totalCount } = await supabase.from('page_visits').select('*', { count: 'exact', head: true });
+
+            const dailyCounts = Array(7).fill(0);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+
+            data.forEach(visit => {
+                const visitDate = new Date(visit.created_at);
+                visitDate.setHours(0,0,0,0);
+                const diffDays = Math.floor((today.getTime() - visitDate.getTime()) / (1000 * 3600 * 24));
+                if (diffDays >= 0 && diffDays < 7) {
+                    dailyCounts[6 - diffDays]++;
+                }
+            });
+
+            setAnalytics({ total: totalCount, daily: dailyCounts });
         };
         fetchAnalytics();
     }, []);
@@ -388,219 +437,231 @@ const AdminPage: React.FC<{
     // --- Handlers ---
     const closeModal = () => {
         setActiveModal(null);
-        setEditingProject(null);
         setEditingPost(null);
-        setProjectFormData({ title: '', description: '', url: '' });
+        setEditingProject(null);
         setBlogFormData({ title: '', summary: '', url: '', image_url: '', content: '' });
+        setProjectFormData({ title: '', url: '', slug: '', content: '', goals_challenges: '', outcome: '', tech_stack: '' });
     };
-    
+
     const handleToggleFeatured = async (id: string, currentStatus: boolean, type: 'projects' | 'blogs') => {
         const { error } = await supabase.from(type).update({ is_featured: !currentStatus }).eq('id', id);
-        if (error) {
-            console.error(`Error updating featured status for ${type}:`, error.message);
-        } else {
-            type === 'projects' ? refreshProjects() : refreshPosts();
-        }
-    };
-    
-    // Blog Handlers
-    const handleBlogChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setBlogFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
-    const handleBlogSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const dataToSubmit = { ...blogFormData, slug: slugify(blogFormData.title) };
-        const { error } = editingPost
-            ? await supabase.from('blogs').update(dataToSubmit).eq('id', editingPost.id)
-            : await supabase.from('blogs').insert([dataToSubmit]);
-        if (error) console.error("Error saving blog post:", error.message);
+        if (error) console.error(`Error updating featured status for ${type}:`, error.message);
         else {
-            refreshPosts();
-            closeModal();
-        }
-    };
-    const handleEditPost = (post: BlogPost) => {
-        setEditingPost(post);
-        setBlogFormData({ title: post.title, summary: post.summary, url: post.url, image_url: post.image_url, content: post.content });
-        setActiveModal('edit-blog');
-    };
-    const handleDeletePost = async (postId: string) => {
-        if (confirm('Delete this post?')) {
-            const { error } = await supabase.from('blogs').delete().eq('id', postId);
-            if (error) console.error("Error deleting post:", error.message);
+            if (type === 'projects') refreshProjects();
             else refreshPosts();
         }
     };
+    
+    const handleBlogChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setBlogFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    
+    const handleBlogSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const dataToSubmit = {
+            ...blogFormData,
+            slug: editingPost ? editingPost.slug : slugify(blogFormData.title),
+        };
 
-    // Project Handlers
-    const handleProjectChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setProjectFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        const { error } = editingPost
+            ? await supabase.from('blogs').update(dataToSubmit).eq('id', editingPost.id)
+            : await supabase.from('blogs').insert([dataToSubmit]);
+
+        if (error) console.error("Error saving blog post:", error.message);
+        else { refreshPosts(); closeModal(); }
+    };
+
+    const handleEditPost = (post: BlogPost) => {
+        setEditingPost(post);
+        setBlogFormData({ title: post.title, summary: post.summary, url: post.url || '', image_url: post.image_url || '', content: post.content || '' });
+        setActiveModal('edit-blog');
+    };
+    
+    const handleProjectChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      if (e.target.name === 'title') {
+        setProjectFormData(prev => ({ ...prev, title: e.target.value, slug: slugify(e.target.value) }));
+      } else {
+        setProjectFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+      }
+    };
+    
     const handleProjectSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        const { tech_stack, ...rest } = projectFormData;
+        const dataToSubmit = {
+            ...rest,
+            tech_stack: tech_stack.split(',').map(s => s.trim()).filter(Boolean)
+        };
         const { error } = editingProject
-            ? await supabase.from('projects').update(projectFormData).eq('id', editingProject.id)
-            : await supabase.from('projects').insert([projectFormData]);
+            ? await supabase.from('projects').update(dataToSubmit).eq('id', editingProject.id)
+            : await supabase.from('projects').insert([dataToSubmit]);
         if (error) console.error("Error saving project:", error.message);
-        else {
-            refreshProjects();
-            closeModal();
-        }
+        else { refreshProjects(); closeModal(); }
     };
+
     const handleEditProject = (project: Project) => {
         setEditingProject(project);
-        setProjectFormData({ title: project.title, description: project.description, url: project.url });
+        setProjectFormData({ 
+            title: project.title, 
+            url: project.url, 
+            slug: project.slug,
+            content: project.content || '',
+            goals_challenges: project.goals_challenges || '',
+            outcome: project.outcome || '',
+            tech_stack: (project.tech_stack || []).join(', '),
+        });
         setActiveModal('edit-project');
     };
-    const handleDeleteProject = async (projectId: string) => {
-        if (confirm('Delete this project?')) {
-            const { error } = await supabase.from('projects').delete().eq('id', projectId);
-            if (error) console.error("Error deleting project:", error.message);
-            else refreshProjects();
+
+    const handleDeleteSelected = async (type: 'projects' | 'blogs') => {
+        const selectedIds = type === 'projects' ? selectedProjects : selectedBlogs;
+        if (selectedIds.length === 0 || !confirm(`Delete ${selectedIds.length} selected item(s)?`)) return;
+        
+        const { error } = await supabase.from(type).delete().in('id', selectedIds);
+        if (error) console.error(`Error deleting ${type}:`, error.message);
+        else {
+            if (type === 'projects') { refreshProjects(); setSelectedProjects([]); } 
+            else { refreshPosts(); setSelectedBlogs([]); }
         }
     };
     
-    // Bulk Import Handler
+    const toggleSelection = (id: string, type: 'projects' | 'blogs') => {
+        const updater = type === 'projects' ? setSelectedProjects : setSelectedBlogs;
+        updater(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+    };
+    
+    const toggleSelectAll = (type: 'projects' | 'blogs') => {
+        const source = type === 'projects' ? projects : posts;
+        const selected = type === 'projects' ? selectedProjects : selectedBlogs;
+        const updater = type === 'projects' ? setSelectedProjects : setSelectedBlogs;
+        if (selected.length === source.length) {
+            updater([]);
+        } else {
+            updater(source.map(item => item.id));
+        }
+    };
+
     const handleBulkImport = async (type: 'projects' | 'blogs') => {
         const jsonString = type === 'projects' ? jsonProjects : jsonBlogs;
-        setImportStatus(null);
-        let data;
         try {
-            data = JSON.parse(jsonString);
-            if (!Array.isArray(data)) throw new Error('JSON must be an array.');
+            const data = JSON.parse(jsonString);
+            if (!Array.isArray(data)) throw new Error("JSON must be an array of objects.");
+            for (const item of data) {
+                if (!item.title) throw new Error("Each item must have a title.");
+                if (!item.slug) item.slug = slugify(item.title);
+            }
+            const { error } = await supabase.from(type).insert(data);
+            if (error) throw error;
+            setImportStatus({ type: 'success', message: `${data.length} ${type} imported successfully!` });
+            if (type === 'projects') { refreshProjects(); setJsonProjects(''); } 
+            else { refreshPosts(); setJsonBlogs(''); }
         } catch (e: any) {
-            setImportStatus({ type: 'error', message: `Invalid JSON: ${e.message}` });
-            return;
+            setImportStatus({ type: 'error', message: e.message || `Failed to import ${type}. Check JSON format.` });
         }
-
-        if (type === 'blogs') {
-             data = data.map(item => ({ ...item, slug: slugify(item.title) }));
-        }
-        
-        const { error } = await supabase.from(type).insert(data);
-        if (error) {
-            setImportStatus({ type: 'error', message: `Supabase Error: ${error.message}` });
-        } else {
-            setImportStatus({ type: 'success', message: `Successfully imported ${data.length} ${type}.` });
-            if (type === 'projects') { setJsonProjects(''); refreshProjects(); } 
-            else { setJsonBlogs(''); refreshPosts(); }
-        }
+        setTimeout(() => setImportStatus(null), 5000);
     };
-    
+
     const handleCopyExample = (type: 'projects' | 'blogs') => {
         let exampleJson = '';
         if (type === 'projects') {
-            exampleJson = `
-[
+            exampleJson = `[
   {
-    // "title": (Required) The name of your project.
-    "title": "My Awesome Project",
-
-    // "description": (Required) A short summary of the project.
-    "description": "This project does amazing things and solves a real-world problem.",
-
-    // "url": (Required) The live URL where the project can be viewed.
-    "url": "https://example.com/my-project",
-
-    // "is_featured": (Optional, defaults to false) Set to true to show this project on the homepage.
-    "is_featured": true
+    "title": "GenGlow Skincare AI",
+    "url": "https://genglow.example.com",
+    "slug": "genglow-skincare-ai",
+    "is_featured": true,
+    "tech_stack": ["Next.js", "React", "TailwindCSS"],
+    "content": "GenGlow is designed to revolutionize skincare by making routines intelligent, tailored, and accessible.",
+    "goals_challenges": "The main challenge was ensuring recommendations felt both accurate and trustworthy. This required careful data handling and smart UX choices.",
+    "outcome": "GenGlow makes skincare guidance accessible and personal. It highlighted the potential of combining AI-driven logic with clean UI design."
   }
-]
-            `.trim();
+]`.trim();
             setCopyProjectJsonText('Copied!');
             setTimeout(() => setCopyProjectJsonText('Copy Example'), 2000);
         } else {
-            exampleJson = `
-[
+             exampleJson = `[
   {
-    // "title": (Required) The title of your blog post.
-    "title": "My First Post in Markdown",
-
-    // "summary": (Required) A brief summary that appears on the blog list.
-    "summary": "Discover how easy it is to write content using Markdown for rich formatting.",
-
-    // "image_url": (Optional) A direct URL to a cover image for the post.
-    "image_url": "https://example.com/images/markdown-post.png",
-
-    // "content": (Optional) The full content of the post. Markdown is supported!
-    // Use '\\n' for new lines in the JSON string.
-    "content": "# Heading 1\\n\\nThis is a paragraph with **bold** and *italic* text.\\n\\n- List item 1\\n- List item 2\\n\\n\`\`\`javascript\\nconsole.log('Hello, Markdown!');\\n\`\`\`",
-    
-    // "is_featured": (Optional, defaults to false)
-    "is_featured": false
+    "title": "My First Blog Post",
+    "summary": "A short summary of what this post is about.",
+    "slug": "my-first-blog-post",
+    "is_featured": false,
+    "content": "# Hello, World!\\n\\nThis is my first post written in **Markdown**.\\n\\n- It's easy\\n- It's fun"
   }
-]
-            `.trim();
+]`.trim();
             setCopyBlogJsonText('Copied!');
             setTimeout(() => setCopyBlogJsonText('Copy Example'), 2000);
         }
         navigator.clipboard.writeText(exampleJson);
     };
 
-    // --- Admin Dashboard UI Components ---
-    const Sparkline = ({ data }: { data: number[] }) => {
-        if (!data.length) return <div className="h-16 bg-gray-100 dark:bg-zinc-800 rounded-md" />;
-        const maxVal = Math.max(...data) || 1;
-        const points = data.map((d, i) => `${(i / (data.length - 1)) * 100},${100 - (d / maxVal) * 90}`).join(' ');
-        
+    const Sparkline: React.FC<{ data: number[]; className?: string }> = ({ data, className = "w-full h-16 stroke-blue-500" }) => {
+        if (data.length < 2) return <div className="h-16 flex items-center justify-center text-sm text-gray-400">Not enough data</div>;
+        const max = Math.max(...data);
+        const min = Math.min(...data);
+        const points = data.map((d, i) => {
+            const x = (i / (data.length - 1)) * 100;
+            const y = 100 - ((d - min) / ((max - min) || 1)) * 100;
+            return `${x},${y}`;
+        }).join(' ');
         return (
-            <svg viewBox="0 0 100 100" className="w-full h-16" preserveAspectRatio="none">
-                <defs>
-                    <linearGradient id="sparkline-gradient" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stopColor="rgba(59, 130, 246, 0.2)" />
-                        <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" />
-                    </linearGradient>
-                </defs>
-                <polyline fill="none" stroke="#3B82F6" strokeWidth="1" points={points} />
-                <polygon fill="url(#sparkline-gradient)" points={`0,100 ${points} 100,100`} />
+            <svg className={className} viewBox="0 0 100 100" preserveAspectRatio="none">
+                <polyline fill="none" strokeWidth="2" points={points} />
             </svg>
         );
     };
-
+    
     const AdminCard: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ title, children, className = '' }) => (
         <div className={`bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg shadow-sm ${className}`}>
-            <h3 className="text-lg font-semibold dark:text-white p-4 border-b dark:border-zinc-800">{title}</h3>
+            <div className="p-4 border-b dark:border-zinc-800">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+            </div>
             <div className="p-4">{children}</div>
         </div>
     );
     
-    // --- Render ---
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-zinc-950">
-            <header className="bg-white dark:bg-zinc-900 border-b dark:border-zinc-800">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-                    <h1 className="text-xl font-bold dark:text-white">Admin Dashboard</h1>
+            <header className="bg-white dark:bg-zinc-900 border-b dark:border-zinc-800 p-4 sm:px-6 lg:px-8">
+                <div className="flex justify-between items-center max-w-7xl mx-auto">
+                    <h1 className="text-xl font-semibold dark:text-white">Admin Dashboard</h1>
                     <a href="/#" className="text-sm font-medium text-blue-600 hover:underline">← Back to Site</a>
                 </div>
             </header>
-            <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                    <AdminCard title="Web Analytics" className="lg:col-span-2">
-                        <div className="flex justify-between items-start">
-                             <div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Total Visits</p>
-                                <p className="text-4xl font-bold dark:text-white">{analytics.total ?? '...'}</p>
-                            </div>
-                            <p className="text-sm text-gray-400">Last 7 days</p>
+            <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <AdminCard title="Web Analytics">
+                        <div className="space-y-2">
+                            <p className="text-3xl font-bold">{analytics.total ?? '...'}</p>
+                            <p className="text-sm text-gray-500">Total Visits</p>
                         </div>
                         <Sparkline data={analytics.daily} />
+                        <p className="text-xs text-center text-gray-400 mt-1">Last 7 days</p>
                     </AdminCard>
                     <AdminCard title="Quick Actions">
                         <div className="space-y-3">
-                            <button onClick={() => setActiveModal('create-project')} className="w-full text-left p-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-md transition-colors">Create New Project</button>
-                            <button onClick={() => setActiveModal('create-blog')} className="w-full text-left p-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-md transition-colors">Create New Blog Post</button>
+                            <button onClick={() => setActiveModal('create-project')} className="w-full text-left p-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 rounded-md transition-colors">Create New Project</button>
+                            <button onClick={() => setActiveModal('create-blog')} className="w-full text-left p-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 rounded-md transition-colors">Create New Blog Post</button>
                         </div>
                     </AdminCard>
                 </div>
-                
+
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     <AdminCard title="Manage Projects">
+                        <div className="flex justify-between items-center mb-3">
+                            <div>
+                                <input type="checkbox" onChange={() => toggleSelectAll('projects')} checked={selectedProjects.length === projects.length && projects.length > 0} className="mr-2" />
+                                <label className="text-sm">Select All</label>
+                            </div>
+                            <button onClick={() => handleDeleteSelected('projects')} disabled={selectedProjects.length === 0} className="text-sm font-medium text-red-600 hover:underline disabled:text-gray-400 disabled:no-underline">Delete Selected</button>
+                        </div>
                         <div className="space-y-3 max-h-96 overflow-y-auto">
                             {projects.map(p => (
                                 <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-md">
-                                    <span className="truncate pr-4">{p.title}</span>
+                                    <div className="flex items-center truncate">
+                                        <input type="checkbox" checked={selectedProjects.includes(p.id)} onChange={() => toggleSelection(p.id, 'projects')} className="mr-3" />
+                                        <span className="truncate pr-4">{p.title}</span>
+                                    </div>
                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                        <button onClick={() => handleToggleFeatured(p.id, p.is_featured, 'projects')} aria-label="Toggle Featured">
-                                            <StarIcon filled={p.is_featured} className={`w-5 h-5 ${p.is_featured ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} />
-                                        </button>
+                                        <button onClick={() => handleToggleFeatured(p.id, p.is_featured, 'projects')}><StarIcon filled={p.is_featured} className={`w-5 h-5 ${p.is_featured ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} /></button>
                                         <button onClick={() => handleEditProject(p)} className="text-sm font-medium text-blue-600 hover:underline">Edit</button>
-                                        <button onClick={() => handleDeleteProject(p.id)} className="text-sm font-medium text-red-600 hover:underline">Delete</button>
                                     </div>
                                 </div>
                             ))}
@@ -608,16 +669,23 @@ const AdminPage: React.FC<{
                     </AdminCard>
 
                     <AdminCard title="Manage Blog Posts">
+                         <div className="flex justify-between items-center mb-3">
+                            <div>
+                                <input type="checkbox" onChange={() => toggleSelectAll('blogs')} checked={selectedBlogs.length === posts.length && posts.length > 0} className="mr-2" />
+                                <label className="text-sm">Select All</label>
+                            </div>
+                            <button onClick={() => handleDeleteSelected('blogs')} disabled={selectedBlogs.length === 0} className="text-sm font-medium text-red-600 hover:underline disabled:text-gray-400 disabled:no-underline">Delete Selected</button>
+                        </div>
                         <div className="space-y-3 max-h-96 overflow-y-auto">
                             {posts.map(p => (
                                 <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-md">
-                                    <span className="truncate pr-4">{p.title}</span>
+                                     <div className="flex items-center truncate">
+                                        <input type="checkbox" checked={selectedBlogs.includes(p.id)} onChange={() => toggleSelection(p.id, 'blogs')} className="mr-3" />
+                                        <span className="truncate pr-4">{p.title}</span>
+                                    </div>
                                     <div className="flex items-center gap-2 flex-shrink-0">
-                                        <button onClick={() => handleToggleFeatured(p.id, p.is_featured, 'blogs')} aria-label="Toggle Featured">
-                                            <StarIcon filled={p.is_featured} className={`w-5 h-5 ${p.is_featured ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} />
-                                        </button>
+                                        <button onClick={() => handleToggleFeatured(p.id, p.is_featured, 'blogs')}><StarIcon filled={p.is_featured} className={`w-5 h-5 ${p.is_featured ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} /></button>
                                         <button onClick={() => handleEditPost(p)} className="text-sm font-medium text-blue-600 hover:underline">Edit</button>
-                                        <button onClick={() => handleDeletePost(p.id)} className="text-sm font-medium text-red-600 hover:underline">Delete</button>
                                     </div>
                                 </div>
                             ))}
@@ -625,48 +693,50 @@ const AdminPage: React.FC<{
                     </AdminCard>
                 </div>
 
-                <div className="mt-6">
-                    <AdminCard title="Bulk Import">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <h4 className="font-semibold mb-2 dark:text-white">Import Projects (JSON)</h4>
-                                <textarea value={jsonProjects} onChange={e => setJsonProjects(e.target.value)} className="w-full h-40 p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" placeholder='Paste JSON array of projects here...'></textarea>
-                                <div className="flex gap-2 mt-2">
-                                    <button onClick={() => handleBulkImport('projects')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">Import Projects</button>
-                                    <button onClick={() => handleCopyExample('projects')} className="px-4 py-2 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors text-sm">{copyProjectJsonText}</button>
-                                </div>
-                            </div>
-                             <div>
-                                <h4 className="font-semibold mb-2 dark:text-white">Import Blog Posts (JSON)</h4>
-                                <textarea value={jsonBlogs} onChange={e => setJsonBlogs(e.target.value)} className="w-full h-40 p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" placeholder='Paste JSON array of blog posts here...'></textarea>
-                                <div className="flex gap-2 mt-2">
-                                    <button onClick={() => handleBulkImport('blogs')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">Import Blog Posts</button>
-                                    <button onClick={() => handleCopyExample('blogs')} className="px-4 py-2 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors text-sm">{copyBlogJsonText}</button>
-                                </div>
-                            </div>
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <AdminCard title="Bulk Import Projects">
+                        <textarea value={jsonProjects} onChange={(e) => setJsonProjects(e.target.value)} placeholder="Paste JSON array of projects here..." className="w-full h-40 p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 font-mono text-sm"></textarea>
+                        <div className="flex justify-between items-center mt-2">
+                            <button onClick={() => handleCopyExample('projects')} className="text-sm font-medium text-blue-600 hover:underline">{copyProjectJsonText}</button>
+                            <button onClick={() => handleBulkImport('projects')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">Import Projects</button>
                         </div>
-                        {importStatus && <p className={`mt-4 text-sm ${importStatus.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>{importStatus.message}</p>}
+                    </AdminCard>
+                     <AdminCard title="Bulk Import Blog Posts">
+                        <textarea value={jsonBlogs} onChange={(e) => setJsonBlogs(e.target.value)} placeholder="Paste JSON array of blog posts here..." className="w-full h-40 p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 font-mono text-sm"></textarea>
+                         <div className="flex justify-between items-center mt-2">
+                            <button onClick={() => handleCopyExample('blogs')} className="text-sm font-medium text-blue-600 hover:underline">{copyBlogJsonText}</button>
+                            <button onClick={() => handleBulkImport('blogs')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">Import Posts</button>
+                        </div>
                     </AdminCard>
                 </div>
+                 {importStatus && (
+                    <div className={`mt-4 p-3 rounded-md text-sm ${importStatus.type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'}`}>
+                        {importStatus.message}
+                    </div>
+                )}
             </main>
 
-            {/* Modals for Editing/Creating */}
             <Modal isOpen={activeModal === 'create-project' || activeModal === 'edit-project'} onClose={closeModal} title={editingProject ? 'Edit Project' : 'Create Project'}>
                 <form onSubmit={handleProjectSubmit} className="space-y-4">
                     <input name="title" value={projectFormData.title} onChange={handleProjectChange} placeholder="Project Title" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
-                    <textarea name="description" value={projectFormData.description} onChange={handleProjectChange} placeholder="Project Description" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 h-24" required></textarea>
-                    <input name="url" value={projectFormData.url} onChange={handleProjectChange} placeholder="https://example.com" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
+                    <input name="slug" value={projectFormData.slug} onChange={handleProjectChange} placeholder="URL Slug (auto-generated)" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
+                    <input name="url" value={projectFormData.url} onChange={handleProjectChange} placeholder="Live Project URL (https://...)" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
+                    <input name="tech_stack" value={projectFormData.tech_stack} onChange={handleProjectChange} placeholder="Tech Stack (comma-separated)" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" />
+                    <textarea name="content" value={projectFormData.content} onChange={handleProjectChange} placeholder="Main Content (Markdown supported)..." className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 h-24"></textarea>
+                    <textarea name="goals_challenges" value={projectFormData.goals_challenges} onChange={handleProjectChange} placeholder="Goals & Challenges (Markdown supported)..." className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 h-24"></textarea>
+                    <textarea name="outcome" value={projectFormData.outcome} onChange={handleProjectChange} placeholder="Outcome (Markdown supported)..." className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 h-24"></textarea>
                     <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">Save Project</button>
                 </form>
             </Modal>
             
             <Modal isOpen={activeModal === 'create-blog' || activeModal === 'edit-blog'} onClose={closeModal} title={editingPost ? 'Edit Blog Post' : 'Create Blog Post'}>
                 <form onSubmit={handleBlogSubmit} className="space-y-4">
-                    <input name="title" value={blogFormData.title} onChange={handleBlogChange} placeholder="Post Title" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
-                    <input name="summary" value={blogFormData.summary} onChange={handleBlogChange} placeholder="Post Summary" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
-                    <input name="image_url" value={blogFormData.image_url} onChange={handleBlogChange} placeholder="Image URL (Optional)" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" />
-                    <textarea name="content" value={blogFormData.content} onChange={handleBlogChange} placeholder="Post content (Markdown supported)..." className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 h-48" required></textarea>
-                    <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">Save Blog Post</button>
+                    <input name="title" value={blogFormData.title} onChange={handleBlogChange} placeholder="Blog Post Title" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
+                    <input name="summary" value={blogFormData.summary} onChange={handleBlogChange} placeholder="Summary" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
+                    <input name="url" value={blogFormData.url || ''} onChange={handleBlogChange} placeholder="External URL (optional)" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" />
+                    <input name="image_url" value={blogFormData.image_url || ''} onChange={handleBlogChange} placeholder="Image URL (optional)" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" />
+                    <textarea name="content" value={blogFormData.content || ''} onChange={handleBlogChange} placeholder="Content (Markdown supported)..." className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 h-48"></textarea>
+                    <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">Save Post</button>
                 </form>
             </Modal>
         </div>
@@ -680,34 +750,40 @@ const App: React.FC = () => {
     const [posts, setPosts] = useState<BlogPost[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [currentRoute, setCurrentRoute] = useState<string>(window.location.hash || '#/');
-    const [isAuthenticated, setIsAuthenticated] = useState(false); // Simple auth state
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
     const refreshPosts = useCallback(async () => {
         const { data, error } = await supabase.from('blogs').select('*').order('created_at', { ascending: false });
-        if (error) console.error("Error fetching posts:", error.message);
+        if (error) console.error("Error fetching posts:", error);
         else setPosts(data || []);
     }, []);
 
     const refreshProjects = useCallback(async () => {
         const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
-        if (error) console.error("Error fetching projects:", error.message);
+        if (error) console.error("Error fetching projects:", error);
         else setProjects(data || []);
     }, []);
 
-    // Initial Data Load
     useEffect(() => {
         const loadData = async () => {
             setIsLoading(true);
+            if (sessionStorage.getItem('isAdminAuthenticated') === 'true') {
+                setIsAuthenticated(true);
+            }
+
+            // Log a new page visit on every app load for analytics.
+            // This runs in the background and doesn't block rendering.
+            supabase.from('page_visits').insert({}).then(({error}) => {
+                if (error) console.error("Error logging page visit:", error);
+            });
+
             await Promise.all([refreshPosts(), refreshProjects()]);
-            // Log a single page visit
-            supabase.from('page_visits').insert([{}]).then();
             setIsLoading(false);
         };
         loadData();
     }, [refreshPosts, refreshProjects]);
 
-    // Theme Management
     useEffect(() => {
         const applyTheme = () => {
             const isDarkMode = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -715,40 +791,53 @@ const App: React.FC = () => {
             localStorage.setItem('theme', theme);
         };
         applyTheme();
-
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         const handleChange = () => applyTheme();
         mediaQuery.addEventListener('change', handleChange);
         return () => mediaQuery.removeEventListener('change', handleChange);
     }, [theme]);
 
-    // Routing
     useEffect(() => {
-        const handleHashChange = () => setCurrentRoute(window.location.hash || '#/');
+        const handleHashChange = () => {
+            setCurrentRoute(window.location.hash || '#/');
+            window.scrollTo(0, 0);
+        };
         window.addEventListener('hashchange', handleHashChange);
+        handleHashChange();
         return () => window.removeEventListener('hashchange', handleHashChange);
     }, []);
+    
+    const handleLogin = (success: boolean) => {
+        if (success) sessionStorage.setItem('isAdminAuthenticated', 'true');
+        else sessionStorage.removeItem('isAdminAuthenticated');
+        setIsAuthenticated(success);
+    };
 
     const renderPage = () => {
         if (isLoading) {
-            return <div className="min-h-screen flex items-center justify-center"><p>Loading...</p></div>;
+             return <div className="min-h-screen flex items-center justify-center"><p>Loading portfolio...</p></div>;
         }
 
+        if (currentRoute.startsWith('#/project/')) {
+            const slug = currentRoute.split('/project/')[1];
+            const project = projects.find(p => p.slug === slug);
+            if (project) {
+                const recommendedProjects = projects.filter(p => p.slug !== slug).slice(0, 3);
+                return <ProjectPage project={project} recommendedProjects={recommendedProjects} />;
+            }
+        }
+        
         if (currentRoute.startsWith('#/blog/')) {
             const slug = currentRoute.split('/blog/')[1];
             const post = posts.find(p => p.slug === slug);
             if (post) {
-                const sortedPosts = [...posts].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                const recommendedPosts = sortedPosts.filter(p => p.slug !== slug).slice(0, 3);
+                const recommendedPosts = posts.filter(p => p.slug !== slug).slice(0, 3);
                 return <BlogPostPage post={post} recommendedPosts={recommendedPosts} />;
             }
-            return <HomePage posts={posts} projects={projects.filter(p => p.is_featured)} />; // Fallback to home
         }
         
         if (currentRoute === '#/admin') {
-            if (!isAuthenticated) {
-                return <LoginPage onLogin={setIsAuthenticated} />;
-            }
+            if (!isAuthenticated) return <LoginPage onLogin={handleLogin} />;
             return <AdminPage posts={posts} refreshPosts={refreshPosts} projects={projects} refreshProjects={refreshProjects} />;
         }
 
@@ -758,7 +847,7 @@ const App: React.FC = () => {
     return (
         <>
             {renderPage()}
-            {currentRoute !== '#/admin' && <Footer theme={theme} setTheme={setTheme} />}
+            {!(currentRoute === '#/admin' && !isAuthenticated) && <Footer theme={theme} setTheme={setTheme} />}
         </>
     );
 };

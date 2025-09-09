@@ -1,9 +1,13 @@
 -- IMPORTANT: If you have already created the tables from a previous version,
--- run the two ALTER TABLE commands below to update your schema without losing data.
+-- run the ALTER TABLE commands below to update your projects table without losing data.
 -- You only need to do this once.
 
--- ALTER TABLE public.projects ADD COLUMN is_featured BOOLEAN DEFAULT false;
--- ALTER TABLE public.blogs ADD COLUMN is_featured BOOLEAN DEFAULT false;
+ALTER TABLE public.projects ADD COLUMN slug TEXT;
+ALTER TABLE public.projects ADD COLUMN content TEXT;
+ALTER TABLE public.projects ADD COLUMN goals_challenges TEXT;
+ALTER TABLE public.projects ADD COLUMN outcome TEXT;
+ALTER TABLE public.projects ADD COLUMN tech_stack TEXT[];
+ALTER TABLE public.projects DROP COLUMN description;
 
 
 -- Create the 'projects' table
@@ -11,10 +15,15 @@ CREATE TABLE public.projects (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   title text NOT NULL,
-  description text NOT NULL,
-  url text NOT NULL,
+  url text NOT NULL, -- The external link to the live project
   is_featured boolean NOT NULL DEFAULT false,
-  CONSTRAINT projects_pkey PRIMARY KEY (id)
+  slug text NOT NULL,
+  content text NULL, -- Main description in Markdown
+  goals_challenges text NULL, -- Section content in Markdown
+  outcome text NULL, -- Section content in Markdown
+  tech_stack text[] NULL, -- Array of strings for tech used
+  CONSTRAINT projects_pkey PRIMARY KEY (id),
+  CONSTRAINT projects_slug_key UNIQUE (slug)
 );
 
 -- Create the 'blogs' table
