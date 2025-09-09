@@ -1,0 +1,46 @@
+
+-- Create the 'projects' table
+CREATE TABLE public.projects (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  title text NOT NULL,
+  description text NOT NULL,
+  url text NOT NULL,
+  CONSTRAINT projects_pkey PRIMARY KEY (id)
+);
+
+-- Create the 'blogs' table
+CREATE TABLE public.blogs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  title text NOT NULL,
+  summary text NOT NULL,
+  slug text NOT NULL,
+  url text NULL,
+  image_url text NULL,
+  content text NULL,
+  CONSTRAINT blogs_pkey PRIMARY KEY (id),
+  CONSTRAINT blogs_slug_key UNIQUE (slug)
+);
+
+-- Enable Row Level Security (RLS) for the tables
+-- This is a good practice for all tables.
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.blogs ENABLE ROW LEVEL SECURITY;
+
+-- Create policies for public access
+-- The current application uses a hardcoded password and the public 'anon' key
+-- to perform all actions. For a production app with real user accounts,
+-- you would create more restrictive policies (e.g., using `auth.uid()`).
+-- For this setup, we allow full public access to match the app's functionality.
+
+-- Policies for 'projects' table
+CREATE POLICY "Enable public read access for projects" ON public.projects
+  FOR SELECT USING (true);
+
+-- Policies for 'blogs' table
+CREATE POLICY "Enable public read access for blogs" ON public.blogs
+  FOR SELECT USING (true);
+
+CREATE POLICY "Enable public full access for blog admin" ON public.blogs
+  FOR ALL USING (true);
