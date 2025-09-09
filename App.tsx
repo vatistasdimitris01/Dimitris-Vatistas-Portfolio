@@ -310,6 +310,8 @@ const AdminPage: React.FC<{
     const [jsonBlogs, setJsonBlogs] = useState('');
     const [importStatus, setImportStatus] = useState<{type: 'success' | 'error', message: string} | null>(null);
     const [analytics, setAnalytics] = useState<{ total: number | null, daily: number[] }>({ total: null, daily: [] });
+    const [copyProjectJsonText, setCopyProjectJsonText] = useState('Copy Example');
+    const [copyBlogJsonText, setCopyBlogJsonText] = useState('Copy Example');
 
     // --- Effects ---
     useEffect(() => {
@@ -435,6 +437,55 @@ const AdminPage: React.FC<{
         }
     };
     
+    const handleCopyExample = (type: 'projects' | 'blogs') => {
+        let exampleJson = '';
+        if (type === 'projects') {
+            exampleJson = `
+[
+  {
+    // "title": (Required) The name of your project.
+    "title": "My Awesome Project",
+
+    // "description": (Required) A short summary of the project.
+    "description": "This project does amazing things and solves a real-world problem.",
+
+    // "url": (Required) The live URL where the project can be viewed.
+    "url": "https://example.com/my-project",
+
+    // "is_featured": (Optional, defaults to false) Set to true to show this project on the homepage.
+    "is_featured": true
+  }
+]
+            `.trim();
+            setCopyProjectJsonText('Copied!');
+            setTimeout(() => setCopyProjectJsonText('Copy Example'), 2000);
+        } else {
+            exampleJson = `
+[
+  {
+    // "title": (Required) The title of your blog post.
+    "title": "Exploring New Technologies",
+
+    // "summary": (Required) A brief summary that appears on the blog list.
+    "summary": "A deep dive into the latest trends shaping the future of web development.",
+
+    // "image_url": (Optional) A direct URL to a cover image for the post.
+    "image_url": "https://example.com/images/my-post-banner.png",
+
+    // "content": (Optional) The full content of the post. Can include HTML tags.
+    "content": "<h1>My First Heading</h1><p>This is a paragraph with <strong>bold text</strong>.</p>",
+    
+    // "is_featured": (Optional, defaults to false)
+    "is_featured": false
+  }
+]
+            `.trim();
+            setCopyBlogJsonText('Copied!');
+            setTimeout(() => setCopyBlogJsonText('Copy Example'), 2000);
+        }
+        navigator.clipboard.writeText(exampleJson);
+    };
+
     // --- Render Components ---
     const Card: React.FC<{ children: React.ReactNode, className?: string }> = ({ children, className }) => (
         <div className={`bg-white dark:bg-zinc-900 rounded-lg shadow-sm border border-gray-200/50 dark:border-zinc-800 p-6 ${className}`}>{children}</div>
@@ -554,14 +605,20 @@ const AdminPage: React.FC<{
                          {importStatus && <div className={`p-3 rounded my-4 text-sm ${importStatus.type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'}`}>{importStatus.message}</div>}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
                              <div>
-                                <h3 className="font-semibold dark:text-white">Import Projects</h3>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Paste a JSON array of project objects.</p>
+                                <div className="flex justify-between items-center mb-1">
+                                    <h3 className="font-semibold dark:text-white">Import Projects</h3>
+                                    <button onClick={() => handleCopyExample('projects')} className="text-xs px-2 py-1 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors">{copyProjectJsonText}</button>
+                                </div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Paste a JSON array of project objects.</p>
                                 <textarea value={jsonProjects} onChange={e => setJsonProjects(e.target.value)} placeholder='[{"title": "...", "description": "...", "url": "..."}]' rows={8} className="w-full p-2 mt-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 font-mono text-sm"></textarea>
                                 <button onClick={() => handleBulkImport('projects')} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Import Projects</button>
                             </div>
                             <div>
-                                <h3 className="font-semibold dark:text-white">Import Blog Posts</h3>
-                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Paste a JSON array of blog post objects.</p>
+                                <div className="flex justify-between items-center mb-1">
+                                    <h3 className="font-semibold dark:text-white">Import Blog Posts</h3>
+                                    <button onClick={() => handleCopyExample('blogs')} className="text-xs px-2 py-1 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors">{copyBlogJsonText}</button>
+                                </div>
+                                 <p className="text-sm text-gray-500 dark:text-gray-400">Paste a JSON array of blog post objects.</p>
                                 <textarea value={jsonBlogs} onChange={e => setJsonBlogs(e.target.value)} placeholder='[{"title": "...", "summary": "..."}]' rows={8} className="w-full p-2 mt-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 font-mono text-sm"></textarea>
                                 <button onClick={() => handleBulkImport('blogs')} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Import Blog Posts</button>
                             </div>
