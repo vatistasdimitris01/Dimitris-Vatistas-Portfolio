@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabaseClient';
 import { ExternalLinkIcon, SunIcon, MoonIcon, CommandIcon, XIcon, InstagramIcon, StarIcon } from './components/Icons';
+import { marked } from 'marked';
 
 // --- HELPERS ---
 const slugify = (text: string) =>
@@ -193,7 +194,7 @@ const HomePage: React.FC<{ posts: BlogPost[], projects: Project[] }> = ({ posts,
     </>
 );
 
-const BlogPostPage: React.FC<{ post: BlogPost }> = ({ post }) => {
+const BlogPostPage: React.FC<{ post: BlogPost; recommendedPosts: BlogPost[]; }> = ({ post, recommendedPosts }) => {
     const [copyButtonText, setCopyButtonText] = useState('Copy URL');
 
     const handleCopyUrl = () => {
@@ -202,6 +203,8 @@ const BlogPostPage: React.FC<{ post: BlogPost }> = ({ post }) => {
             setTimeout(() => setCopyButtonText('Copy URL'), 2000);
         });
     };
+
+    const contentHtml = post.content ? marked.parse(post.content) as string : '';
 
     return (
         <>
@@ -232,23 +235,25 @@ const BlogPostPage: React.FC<{ post: BlogPost }> = ({ post }) => {
                         />
                     )}
                     {post.content ? (
-                      <div className="prose prose-neutral dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: post.content }} />
+                      <div className="prose prose-neutral dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: contentHtml }} />
                     ) : (
                       <p className="text-gray-500">This post is currently being written. Check back soon!</p>
                     )}
                 </article>
 
-                 <div className="mt-16 pt-8 border-t border-gray-100 dark:border-zinc-800 space-y-8">
+                 <nav className="mt-16 pt-8 border-t border-gray-100 dark:border-zinc-800 space-y-8">
                     <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Further Reading</h2>
-                    <ul className="space-y-4 list-disc list-inside text-gray-600 dark:text-gray-400">
-                        <li><a href="#" className="hover:text-black dark:hover:text-white underline">The Future of Design Systems</a></li>
-                        <li><a href="#" className="hover:text-black dark:hover:text-white underline">Ethical AI in Practice</a></li>
-                    </ul>
-                </div>
-                <div className="mt-8">
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Music for Inspiration</h2>
-                     <p className="text-gray-600 dark:text-gray-400 mt-2">Need some tunes while working? Check out "Mellow" by Tycho—a perfect blend of creativity and rhythm.</p>
-                </div>
+                    <div className="space-y-4">
+                        {recommendedPosts.map(p => (
+                            <a href={`/#/blog/${p.slug}`} key={p.id} className="group block text-gray-800 dark:text-gray-200 hover:text-black dark:hover:text-white transition-colors">
+                                <div className="flex justify-between items-center font-semibold">
+                                    <span>{p.title}</span>
+                                    <span className="transform transition-transform group-hover:translate-x-1">&rarr;</span>
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                </nav>
             </main>
         </>
     );
@@ -294,6 +299,39 @@ const LoginPage: React.FC<{ onLogin: (success: boolean) => void }> = ({ onLogin 
 };
 
 // --- ADMIN PAGE & COMPONENTS ---
+type ModalType = 'create-project' | 'edit-project' | 'create-blog' | 'edit-blog' | null;
+
+const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; children: React.ReactNode }> = ({ isOpen, onClose, title, children }) => {
+    useEffect(() => {
+        const handleEsc = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [onClose]);
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true">
+            <div className="bg-white dark:bg-zinc-900 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-4 border-b dark:border-zinc-800">
+                    <h2 className="text-xl font-semibold dark:text-white">{title}</h2>
+                    <button onClick={onClose} aria-label="Close modal" className="text-gray-400 hover:text-gray-800 dark:hover:text-white transition-colors">
+                        <XIcon className="w-6 h-6" />
+                    </button>
+                </div>
+                <div className="p-6 overflow-y-auto">
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
 const AdminPage: React.FC<{
     posts: BlogPost[];
     refreshPosts: () => void;
@@ -312,6 +350,8 @@ const AdminPage: React.FC<{
     const [analytics, setAnalytics] = useState<{ total: number | null, daily: number[] }>({ total: null, daily: [] });
     const [copyProjectJsonText, setCopyProjectJsonText] = useState('Copy Example');
     const [copyBlogJsonText, setCopyBlogJsonText] = useState('Copy Example');
+    const [activeModal, setActiveModal] = useState<ModalType>(null);
+
 
     // --- Effects ---
     useEffect(() => {
@@ -346,6 +386,14 @@ const AdminPage: React.FC<{
     }, []);
 
     // --- Handlers ---
+    const closeModal = () => {
+        setActiveModal(null);
+        setEditingProject(null);
+        setEditingPost(null);
+        setProjectFormData({ title: '', description: '', url: '' });
+        setBlogFormData({ title: '', summary: '', url: '', image_url: '', content: '' });
+    };
+    
     const handleToggleFeatured = async (id: string, currentStatus: boolean, type: 'projects' | 'blogs') => {
         const { error } = await supabase.from(type).update({ is_featured: !currentStatus }).eq('id', id);
         if (error) {
@@ -365,15 +413,14 @@ const AdminPage: React.FC<{
             : await supabase.from('blogs').insert([dataToSubmit]);
         if (error) console.error("Error saving blog post:", error.message);
         else {
-            setBlogFormData({ title: '', summary: '', url: '', image_url: '', content: '' });
-            setEditingPost(null);
             refreshPosts();
+            closeModal();
         }
     };
     const handleEditPost = (post: BlogPost) => {
         setEditingPost(post);
         setBlogFormData({ title: post.title, summary: post.summary, url: post.url, image_url: post.image_url, content: post.content });
-        document.getElementById('blog-form')?.scrollIntoView({ behavior: 'smooth' });
+        setActiveModal('edit-blog');
     };
     const handleDeletePost = async (postId: string) => {
         if (confirm('Delete this post?')) {
@@ -392,15 +439,14 @@ const AdminPage: React.FC<{
             : await supabase.from('projects').insert([projectFormData]);
         if (error) console.error("Error saving project:", error.message);
         else {
-            setProjectFormData({ title: '', description: '', url: '' });
-            setEditingProject(null);
             refreshProjects();
+            closeModal();
         }
     };
     const handleEditProject = (project: Project) => {
         setEditingProject(project);
         setProjectFormData({ title: project.title, description: project.description, url: project.url });
-        document.getElementById('project-form')?.scrollIntoView({ behavior: 'smooth' });
+        setActiveModal('edit-project');
     };
     const handleDeleteProject = async (projectId: string) => {
         if (confirm('Delete this project?')) {
@@ -464,16 +510,17 @@ const AdminPage: React.FC<{
 [
   {
     // "title": (Required) The title of your blog post.
-    "title": "Exploring New Technologies",
+    "title": "My First Post in Markdown",
 
     // "summary": (Required) A brief summary that appears on the blog list.
-    "summary": "A deep dive into the latest trends shaping the future of web development.",
+    "summary": "Discover how easy it is to write content using Markdown for rich formatting.",
 
     // "image_url": (Optional) A direct URL to a cover image for the post.
-    "image_url": "https://example.com/images/my-post-banner.png",
+    "image_url": "https://example.com/images/markdown-post.png",
 
-    // "content": (Optional) The full content of the post. Can include HTML tags.
-    "content": "<h1>My First Heading</h1><p>This is a paragraph with <strong>bold text</strong>.</p>",
+    // "content": (Optional) The full content of the post. Markdown is supported!
+    // Use '\\n' for new lines in the JSON string.
+    "content": "# Heading 1\\n\\nThis is a paragraph with **bold** and *italic* text.\\n\\n- List item 1\\n- List item 2\\n\\n\`\`\`javascript\\nconsole.log('Hello, Markdown!');\\n\`\`\`",
     
     // "is_featured": (Optional, defaults to false)
     "is_featured": false
@@ -486,300 +533,233 @@ const AdminPage: React.FC<{
         navigator.clipboard.writeText(exampleJson);
     };
 
-    // --- Render Components ---
-    const Card: React.FC<{ children: React.ReactNode, className?: string }> = ({ children, className }) => (
-        <div className={`bg-white dark:bg-zinc-900 rounded-lg shadow-sm border border-gray-200/50 dark:border-zinc-800 p-6 ${className}`}>{children}</div>
-    );
-    
-    const Sparkline: React.FC<{ data: number[] }> = ({ data }) => {
-        if (!data || data.length < 2) return <div className="h-16 flex items-center justify-center text-sm text-gray-400">Not enough data</div>;
-        const width = 150;
-        const height = 40;
-        const max = Math.max(...data) || 1;
-        const points = data.map((d, i) => `${(i / (data.length - 1)) * width},${height - (d / max) * height}`).join(' ');
-        const path = `M${points.split(' ')[0]} L${points}`;
-
+    // --- Admin Dashboard UI Components ---
+    const Sparkline = ({ data }: { data: number[] }) => {
+        if (!data.length) return <div className="h-16 bg-gray-100 dark:bg-zinc-800 rounded-md" />;
+        const maxVal = Math.max(...data) || 1;
+        const points = data.map((d, i) => `${(i / (data.length - 1)) * 100},${100 - (d / maxVal) * 90}`).join(' ');
+        
         return (
-            <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-16">
-                 <defs>
+            <svg viewBox="0 0 100 100" className="w-full h-16" preserveAspectRatio="none">
+                <defs>
                     <linearGradient id="sparkline-gradient" x1="0" x2="0" y1="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                        <stop offset="0%" stopColor="rgba(59, 130, 246, 0.2)" />
+                        <stop offset="100%" stopColor="rgba(59, 130, 246, 0)" />
                     </linearGradient>
                 </defs>
-                <path d={path} fill="none" stroke="#3b82f6" strokeWidth="2" />
-                <path d={`${path} V${height} L0,${height} Z`} fill="url(#sparkline-gradient)" />
+                <polyline fill="none" stroke="#3B82F6" strokeWidth="1" points={points} />
+                <polygon fill="url(#sparkline-gradient)" points={`0,100 ${points} 100,100`} />
             </svg>
         );
     };
 
+    const AdminCard: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ title, children, className = '' }) => (
+        <div className={`bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg shadow-sm ${className}`}>
+            <h3 className="text-lg font-semibold dark:text-white p-4 border-b dark:border-zinc-800">{title}</h3>
+            <div className="p-4">{children}</div>
+        </div>
+    );
+    
+    // --- Render ---
     return (
-        <div className="bg-gray-50 dark:bg-zinc-950 min-h-screen">
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                <a href="/#" className="text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors mb-6 inline-block">
-                    &larr; Back to Portfolio
-                </a>
-                <h1 className="text-3xl font-bold dark:text-white mb-8">Dashboard</h1>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    <Card>
-                        <h3 className="text-gray-500 dark:text-gray-400 font-medium">Total Visits</h3>
-                        <p className="text-4xl font-bold dark:text-white mt-2">{analytics.total ?? '...'}</p>
-                        <p className="text-sm text-gray-400 dark:text-gray-500 mt-2">Last 7 Days</p>
+        <div className="min-h-screen bg-gray-50 dark:bg-zinc-950">
+            <header className="bg-white dark:bg-zinc-900 border-b dark:border-zinc-800">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                    <h1 className="text-xl font-bold dark:text-white">Admin Dashboard</h1>
+                    <a href="/#" className="text-sm font-medium text-blue-600 hover:underline">← Back to Site</a>
+                </div>
+            </header>
+            <main className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                    <AdminCard title="Web Analytics" className="lg:col-span-2">
+                        <div className="flex justify-between items-start">
+                             <div>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Total Visits</p>
+                                <p className="text-4xl font-bold dark:text-white">{analytics.total ?? '...'}</p>
+                            </div>
+                            <p className="text-sm text-gray-400">Last 7 days</p>
+                        </div>
                         <Sparkline data={analytics.daily} />
-                    </Card>
-                    <Card>
-                        <h3 className="text-gray-500 dark:text-gray-400 font-medium">Quick Actions</h3>
-                        <div className="mt-4 space-y-3">
-                            <button onClick={() => document.getElementById('project-form')?.scrollIntoView({ behavior: 'smooth' })} className="w-full text-left p-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-md transition-colors">Create New Project</button>
-                            <button onClick={() => document.getElementById('blog-form')?.scrollIntoView({ behavior: 'smooth' })} className="w-full text-left p-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-md transition-colors">Create New Blog Post</button>
+                    </AdminCard>
+                    <AdminCard title="Quick Actions">
+                        <div className="space-y-3">
+                            <button onClick={() => setActiveModal('create-project')} className="w-full text-left p-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-md transition-colors">Create New Project</button>
+                            <button onClick={() => setActiveModal('create-blog')} className="w-full text-left p-3 bg-gray-100 dark:bg-zinc-800 hover:bg-gray-200 dark:hover:bg-zinc-700 rounded-md transition-colors">Create New Blog Post</button>
                         </div>
-                    </Card>
-                    <Card>
-                        <h3 className="text-gray-500 dark:text-gray-400 font-medium">Content Stats</h3>
-                        <div className="mt-4 space-y-4">
-                            <div className="flex justify-between items-baseline">
-                                <p className="dark:text-white">Total Projects</p>
-                                <p className="text-2xl font-semibold dark:text-white">{projects.length}</p>
-                            </div>
-                            <div className="flex justify-between items-baseline">
-                                <p className="dark:text-white">Total Blog Posts</p>
-                                <p className="text-2xl font-semibold dark:text-white">{posts.length}</p>
-                            </div>
+                    </AdminCard>
+                </div>
+                
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    <AdminCard title="Manage Projects">
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {projects.map(p => (
+                                <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-md">
+                                    <span className="truncate pr-4">{p.title}</span>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        <button onClick={() => handleToggleFeatured(p.id, p.is_featured, 'projects')} aria-label="Toggle Featured">
+                                            <StarIcon filled={p.is_featured} className={`w-5 h-5 ${p.is_featured ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} />
+                                        </button>
+                                        <button onClick={() => handleEditProject(p)} className="text-sm font-medium text-blue-600 hover:underline">Edit</button>
+                                        <button onClick={() => handleDeleteProject(p.id)} className="text-sm font-medium text-red-600 hover:underline">Delete</button>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
-                    </Card>
+                    </AdminCard>
+
+                    <AdminCard title="Manage Blog Posts">
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                            {posts.map(p => (
+                                <div key={p.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-zinc-800/50 rounded-md">
+                                    <span className="truncate pr-4">{p.title}</span>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        <button onClick={() => handleToggleFeatured(p.id, p.is_featured, 'blogs')} aria-label="Toggle Featured">
+                                            <StarIcon filled={p.is_featured} className={`w-5 h-5 ${p.is_featured ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} />
+                                        </button>
+                                        <button onClick={() => handleEditPost(p)} className="text-sm font-medium text-blue-600 hover:underline">Edit</button>
+                                        <button onClick={() => handleDeletePost(p.id)} className="text-sm font-medium text-red-600 hover:underline">Delete</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </AdminCard>
                 </div>
 
-                <div className="space-y-12">
-                     <Card>
-                        <h2 id="project-form" className="text-xl font-semibold dark:text-white mb-4">{editingProject ? 'Edit Project' : 'Create New Project'}</h2>
-                        <form onSubmit={handleProjectSubmit} className="space-y-4">
-                            <input type="text" name="title" placeholder="Title" value={projectFormData.title} onChange={handleProjectChange} required className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700"/>
-                            <input type="text" name="url" placeholder="Project URL" value={projectFormData.url} onChange={handleProjectChange} required className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700"/>
-                            <textarea name="description" placeholder="Description" value={projectFormData.description} onChange={handleProjectChange} rows={3} required className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700"></textarea>
-                            <div className="flex gap-4">
-                                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">{editingProject ? 'Update Project' : 'Create Project'}</button>
-                                {editingProject && <button type="button" onClick={() => { setEditingProject(null); setProjectFormData({ title: '', description: '', url: '' }); }} className="px-4 py-2 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600">Cancel</button>}
-                            </div>
-                        </form>
-                        <h3 className="text-lg font-semibold dark:text-white mt-8 mb-4">Existing Projects</h3>
-                        <ul className="space-y-2">{projects.map(p => (
-                            <li key={p.id} className="p-3 flex justify-between items-center bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
-                                <div><p className="font-medium dark:text-white">{p.title}</p></div>
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => handleToggleFeatured(p.id, p.is_featured, 'projects')} title="Feature Project"><StarIcon filled={p.is_featured} className={`w-5 h-5 ${p.is_featured ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} /></button>
-                                    <button onClick={() => handleEditProject(p)} className="text-sm text-blue-500 hover:underline">Edit</button>
-                                    <button onClick={() => handleDeleteProject(p.id)} className="text-sm text-red-500 hover:underline">Delete</button>
-                                </div>
-                            </li>))}
-                        </ul>
-                    </Card>
-
-                    <Card>
-                        <h2 id="blog-form" className="text-xl font-semibold dark:text-white mb-4">{editingPost ? 'Edit Blog Post' : 'Create New Blog Post'}</h2>
-                        <form onSubmit={handleBlogSubmit} className="space-y-4">
-                             <input type="text" name="title" placeholder="Title" value={blogFormData.title} onChange={handleBlogChange} required className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700"/>
-                             <input type="text" name="summary" placeholder="Summary" value={blogFormData.summary} onChange={handleBlogChange} required className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700"/>
-                             <input type="text" name="image_url" placeholder="Image URL (optional)" value={blogFormData.image_url} onChange={handleBlogChange} className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700"/>
-                             <textarea name="content" placeholder="Content (HTML, optional)" value={blogFormData.content} onChange={handleBlogChange} rows={10} className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700"></textarea>
-                            <div className="flex gap-4">
-                                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">{editingPost ? 'Update Post' : 'Create Post'}</button>
-                                {editingPost && <button type="button" onClick={() => { setEditingPost(null); setBlogFormData({ title: '', summary: '', url: '', image_url: '', content: '' }); }} className="px-4 py-2 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600">Cancel</button>}
-                            </div>
-                        </form>
-                        <h3 className="text-lg font-semibold dark:text-white mt-8 mb-4">Existing Blog Posts</h3>
-                        <ul className="space-y-2">{posts.map(p => (
-                            <li key={p.id} className="p-3 flex justify-between items-center bg-gray-50 dark:bg-zinc-800/50 rounded-lg">
-                                <div><p className="font-medium dark:text-white">{p.title}</p></div>
-                                <div className="flex items-center gap-3">
-                                    <button onClick={() => handleToggleFeatured(p.id, p.is_featured, 'blogs')} title="Feature Post"><StarIcon filled={p.is_featured} className={`w-5 h-5 ${p.is_featured ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} /></button>
-                                    <button onClick={() => handleEditPost(p)} className="text-sm text-blue-500 hover:underline">Edit</button>
-                                    <button onClick={() => handleDeletePost(p.id)} className="text-sm text-red-500 hover:underline">Delete</button>
-                                </div>
-                            </li>))}
-                        </ul>
-                    </Card>
-
-                    <Card>
-                        <h2 className="text-xl font-semibold dark:text-white">Bulk Import</h2>
-                         {importStatus && <div className={`p-3 rounded my-4 text-sm ${importStatus.type === 'success' ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'}`}>{importStatus.message}</div>}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
-                             <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <h3 className="font-semibold dark:text-white">Import Projects</h3>
-                                    <button onClick={() => handleCopyExample('projects')} className="text-xs px-2 py-1 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors">{copyProjectJsonText}</button>
-                                </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">Paste a JSON array of project objects.</p>
-                                <textarea value={jsonProjects} onChange={e => setJsonProjects(e.target.value)} placeholder='[{"title": "...", "description": "...", "url": "..."}]' rows={8} className="w-full p-2 mt-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 font-mono text-sm"></textarea>
-                                <button onClick={() => handleBulkImport('projects')} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Import Projects</button>
-                            </div>
+                <div className="mt-6">
+                    <AdminCard title="Bulk Import">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <h3 className="font-semibold dark:text-white">Import Blog Posts</h3>
-                                    <button onClick={() => handleCopyExample('blogs')} className="text-xs px-2 py-1 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors">{copyBlogJsonText}</button>
+                                <h4 className="font-semibold mb-2 dark:text-white">Import Projects (JSON)</h4>
+                                <textarea value={jsonProjects} onChange={e => setJsonProjects(e.target.value)} className="w-full h-40 p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" placeholder='Paste JSON array of projects here...'></textarea>
+                                <div className="flex gap-2 mt-2">
+                                    <button onClick={() => handleBulkImport('projects')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">Import Projects</button>
+                                    <button onClick={() => handleCopyExample('projects')} className="px-4 py-2 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors text-sm">{copyProjectJsonText}</button>
                                 </div>
-                                 <p className="text-sm text-gray-500 dark:text-gray-400">Paste a JSON array of blog post objects.</p>
-                                <textarea value={jsonBlogs} onChange={e => setJsonBlogs(e.target.value)} placeholder='[{"title": "...", "summary": "..."}]' rows={8} className="w-full p-2 mt-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 font-mono text-sm"></textarea>
-                                <button onClick={() => handleBulkImport('blogs')} className="mt-2 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Import Blog Posts</button>
+                            </div>
+                             <div>
+                                <h4 className="font-semibold mb-2 dark:text-white">Import Blog Posts (JSON)</h4>
+                                <textarea value={jsonBlogs} onChange={e => setJsonBlogs(e.target.value)} className="w-full h-40 p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" placeholder='Paste JSON array of blog posts here...'></textarea>
+                                <div className="flex gap-2 mt-2">
+                                    <button onClick={() => handleBulkImport('blogs')} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm">Import Blog Posts</button>
+                                    <button onClick={() => handleCopyExample('blogs')} className="px-4 py-2 bg-gray-200 dark:bg-zinc-700 rounded hover:bg-gray-300 dark:hover:bg-zinc-600 transition-colors text-sm">{copyBlogJsonText}</button>
+                                </div>
                             </div>
                         </div>
-                    </Card>
+                        {importStatus && <p className={`mt-4 text-sm ${importStatus.type === 'error' ? 'text-red-500' : 'text-green-500'}`}>{importStatus.message}</p>}
+                    </AdminCard>
                 </div>
             </main>
+
+            {/* Modals for Editing/Creating */}
+            <Modal isOpen={activeModal === 'create-project' || activeModal === 'edit-project'} onClose={closeModal} title={editingProject ? 'Edit Project' : 'Create Project'}>
+                <form onSubmit={handleProjectSubmit} className="space-y-4">
+                    <input name="title" value={projectFormData.title} onChange={handleProjectChange} placeholder="Project Title" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
+                    <textarea name="description" value={projectFormData.description} onChange={handleProjectChange} placeholder="Project Description" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 h-24" required></textarea>
+                    <input name="url" value={projectFormData.url} onChange={handleProjectChange} placeholder="https://example.com" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
+                    <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">Save Project</button>
+                </form>
+            </Modal>
+            
+            <Modal isOpen={activeModal === 'create-blog' || activeModal === 'edit-blog'} onClose={closeModal} title={editingPost ? 'Edit Blog Post' : 'Create Blog Post'}>
+                <form onSubmit={handleBlogSubmit} className="space-y-4">
+                    <input name="title" value={blogFormData.title} onChange={handleBlogChange} placeholder="Post Title" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
+                    <input name="summary" value={blogFormData.summary} onChange={handleBlogChange} placeholder="Post Summary" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" required />
+                    <input name="image_url" value={blogFormData.image_url} onChange={handleBlogChange} placeholder="Image URL (Optional)" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" />
+                    <textarea name="content" value={blogFormData.content} onChange={handleBlogChange} placeholder="Post content (Markdown supported)..." className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 h-48" required></textarea>
+                    <button type="submit" className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">Save Blog Post</button>
+                </form>
+            </Modal>
         </div>
     );
 };
 
 
-// --- ROUTER & APP ---
+// --- MAIN APP ---
 const App: React.FC = () => {
-    const [route, setRoute] = useState(window.location.hash);
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system');
-    const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(() => sessionStorage.getItem('isAdminAuthenticated') === 'true');
     const [posts, setPosts] = useState<BlogPost[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [currentRoute, setCurrentRoute] = useState<string>(window.location.hash || '#/');
+    const [isAuthenticated, setIsAuthenticated] = useState(false); // Simple auth state
+    const [isLoading, setIsLoading] = useState(true);
 
-    const fetchPosts = useCallback(async () => {
+    const refreshPosts = useCallback(async () => {
         const { data, error } = await supabase.from('blogs').select('*').order('created_at', { ascending: false });
-        if (error) console.error("Error fetching posts:", error);
+        if (error) console.error("Error fetching posts:", error.message);
         else setPosts(data || []);
     }, []);
 
-    const fetchProjects = useCallback(async (admin = false) => {
-        let query = supabase.from('projects').select('*').order('created_at', { ascending: false });
-        // On the public site, only fetch featured projects. In admin, fetch all.
-        if (!admin) {
-            query = query.eq('is_featured', true);
-        }
-        const { data, error } = await query;
-        if (error) console.error("Error fetching projects:", error);
+    const refreshProjects = useCallback(async () => {
+        const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
+        if (error) console.error("Error fetching projects:", error.message);
         else setProjects(data || []);
     }, []);
 
+    // Initial Data Load
     useEffect(() => {
-        const fetchData = async () => {
-            setLoading(true);
-            // Pass true to fetchAllProjects for admin context, false otherwise
-            const onAdminPage = window.location.hash.startsWith('#/admin');
-            await Promise.all([fetchPosts(), fetchProjects(onAdminPage)]);
-            setLoading(false);
+        const loadData = async () => {
+            setIsLoading(true);
+            await Promise.all([refreshPosts(), refreshProjects()]);
+            // Log a single page visit
+            supabase.from('page_visits').insert([{}]).then();
+            setIsLoading(false);
         };
-        fetchData();
-    }, [fetchPosts, fetchProjects, route]); // Re-fetch data if route changes (e.g., navigating to admin)
+        loadData();
+    }, [refreshPosts, refreshProjects]);
 
+    // Theme Management
     useEffect(() => {
-        const asciiArt = `
-VVVVVVVV           VVVVVVVV DDDDDDDDDDDDD       
-V::::::V           V::::::V D::::::::::::DDD    
-V::::::V           V::::::V D:::::::::::::::DD  
-V::::::V           V::::::V DDD:::::DDDDD:::::D 
- V:::::V           V:::::V    D:::::D    D:::::D
-  V:::::V         V:::::V     D:::::D     D:::::D
-   V:::::V       V:::::V      D:::::D     D:::::D
-    V:::::V     V:::::V       D:::::D     D:::::D
-     V:::::V   V:::::V        D:::::D     D:::::D
-      V:::::V V:::::V         D:::::D     D:::::D
-       V:::::V:::::V          D:::::D     D:::::D
-        V:::::::::V           D:::::D    D:::::D
-         V:::::::V          DDD:::::DDDDD:::::D
-          V:::::V           D:::::::::::::::DD 
-           V:::V            D::::::::::::DDD   
-            VVV             DDDDDDDDDDDD       
-`;
-        console.log(asciiArt);
-        
-        const logVisit = async () => {
-            // Don't log visits from admin or during local development
-            if (window.location.hash.startsWith('#/admin') || ['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-                return;
-            }
-            try {
-                await supabase.from('page_visits').insert([{}]);
-            } catch (error) {
-                console.error('Error logging page visit:', error);
-            }
+        const applyTheme = () => {
+            const isDarkMode = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.classList.toggle('dark', isDarkMode);
+            localStorage.setItem('theme', theme);
         };
-        logVisit();
-    }, []);
-    
+        applyTheme();
+
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = () => applyTheme();
+        mediaQuery.addEventListener('change', handleChange);
+        return () => mediaQuery.removeEventListener('change', handleChange);
+    }, [theme]);
+
+    // Routing
     useEffect(() => {
-        const handleHashChange = () => {
-            window.scrollTo(0, 0);
-            setRoute(window.location.hash);
-        };
+        const handleHashChange = () => setCurrentRoute(window.location.hash || '#/');
         window.addEventListener('hashchange', handleHashChange);
         return () => window.removeEventListener('hashchange', handleHashChange);
     }, []);
-    
-    useEffect(() => {
-        const root = document.documentElement;
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
-        const applyTheme = (currentTheme: Theme) => {
-            if (currentTheme === 'dark' || (currentTheme === 'system' && mediaQuery.matches)) {
-                root.classList.add('dark');
-            } else {
-                root.classList.remove('dark');
-            }
-        };
-    
-        applyTheme(theme);
-        localStorage.setItem('theme', theme);
-    
-        const handleSystemThemeChange = (e: MediaQueryListEvent) => {
-            if (localStorage.getItem('theme') === 'system') {
-                if (e.matches) {
-                    root.classList.add('dark');
-                } else {
-                    root.classList.remove('dark');
-                }
-            }
-        };
-    
-        mediaQuery.addEventListener('change', handleSystemThemeChange);
-    
-        return () => {
-            mediaQuery.removeEventListener('change', handleSystemThemeChange);
-        };
-    }, [theme]);
-    
 
-    const handleLogin = (success: boolean) => {
-        if (success) {
-            sessionStorage.setItem('isAdminAuthenticated', 'true');
-            setIsAdminAuthenticated(true);
-            setRoute('#/admin'); // Redirect to admin page on successful login
+    const renderPage = () => {
+        if (isLoading) {
+            return <div className="min-h-screen flex items-center justify-center"><p>Loading...</p></div>;
         }
+
+        if (currentRoute.startsWith('#/blog/')) {
+            const slug = currentRoute.split('/blog/')[1];
+            const post = posts.find(p => p.slug === slug);
+            if (post) {
+                const sortedPosts = [...posts].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                const recommendedPosts = sortedPosts.filter(p => p.slug !== slug).slice(0, 3);
+                return <BlogPostPage post={post} recommendedPosts={recommendedPosts} />;
+            }
+            return <HomePage posts={posts} projects={projects.filter(p => p.is_featured)} />; // Fallback to home
+        }
+        
+        if (currentRoute === '#/admin') {
+            if (!isAuthenticated) {
+                return <LoginPage onLogin={setIsAuthenticated} />;
+            }
+            return <AdminPage posts={posts} refreshPosts={refreshPosts} projects={projects} refreshProjects={refreshProjects} />;
+        }
+
+        return <HomePage posts={posts} projects={projects.filter(p => p.is_featured)} />;
     };
-
-    const path = route.replace(/^#/, '');
-    let pageContent;
-    let showFooter = true;
-
-    if (loading) {
-        pageContent = <div className="min-h-screen flex items-center justify-center dark:text-white">Loading...</div>;
-        showFooter = false;
-    } else if (path.startsWith('/blog/')) {
-        const slug = path.substring('/blog/'.length);
-        const post = posts.find(p => p.slug === slug);
-        pageContent = post ? <BlogPostPage post={post} /> : <HomePage posts={posts} projects={projects} />;
-    } else if (path === '/admin') {
-        if (isAdminAuthenticated) {
-            pageContent = <AdminPage posts={posts} refreshPosts={fetchPosts} projects={projects} refreshProjects={() => fetchProjects(true)} />;
-        } else {
-            pageContent = <LoginPage onLogin={handleLogin} />;
-        }
-        showFooter = false;
-    } else {
-        pageContent = <HomePage posts={posts} projects={projects} />;
-    }
     
     return (
-      <>
-        {pageContent}
-        {showFooter && <Footer theme={theme} setTheme={setTheme} />}
-      </>
+        <>
+            {renderPage()}
+            {currentRoute !== '#/admin' && <Footer theme={theme} setTheme={setTheme} />}
+        </>
     );
 };
 
