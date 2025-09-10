@@ -54,6 +54,7 @@ type SiteLayoutSection = {
     id: number;
     section_id: string;
     sort_order: number;
+    content: any; // JSONB content
 };
 
 
@@ -67,6 +68,139 @@ const workExperience = [
     { role: "Developer", company: "AI Beauty", period: "2022 - 2023" },
     { role: "Developer", company: "AI Age Verification", period: "2022" },
 ];
+
+
+// --- PREMADE SECTIONS LIBRARY ---
+const HeroCentered: React.FC<{ content: any }> = ({ content }) => (
+    <div className="text-center py-24">
+        <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-4">{content?.headline || "Headline"}</h1>
+        <p className="text-lg md:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-8">{content?.subtext || "Subtext describing the hero section."}</p>
+        <a href={content?.cta_link || "#"} className="bg-blue-600 text-white font-semibold px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors">
+            {content?.cta_text || "Call to Action"}
+        </a>
+    </div>
+);
+
+const HeroSplit: React.FC<{ content: any }> = ({ content }) => (
+    <div className="flex flex-col md:flex-row items-center gap-12 py-20">
+        <div className="md:w-1/2 space-y-4">
+            <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white">{content?.headline || "Headline"}</h1>
+            <p className="text-lg text-gray-600 dark:text-gray-400">{content?.subtext || "Subtext for the split hero section."}</p>
+            <a href={content?.cta_link || "#"} className="inline-block bg-blue-600 text-white font-semibold px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                {content?.cta_text || "CTA"}
+            </a>
+        </div>
+        <div className="md:w-1/2">
+            <img src={content?.image_url || "https://placehold.co/600x400"} alt="Placeholder" className="rounded-lg shadow-lg w-full h-auto" />
+        </div>
+    </div>
+);
+
+const FeaturesGrid: React.FC<{ content: any }> = ({ content }) => (
+    <Section title={content?.title || "Features"}>
+        <div className="grid md:grid-cols-3 gap-8">
+            {(content?.features || [{}, {}, {}]).map((feature: any, i: number) => (
+                <div key={i} className="text-center">
+                    <div className="text-blue-500 mb-3 mx-auto w-12 h-12 flex items-center justify-center bg-blue-50 dark:bg-zinc-800 rounded-full">{feature.icon || '★'}</div>
+                    <h3 className="text-lg font-semibold mb-2">{feature.name || "Feature Name"}</h3>
+                    <p className="text-gray-500 dark:text-gray-400">{feature.description || "Feature description goes here."}</p>
+                </div>
+            ))}
+        </div>
+    </Section>
+);
+
+const TestimonialsCards: React.FC<{ content: any }> = ({ content }) => (
+    <Section title={content?.title || "Testimonials"}>
+        <div className="grid md:grid-cols-2 gap-6">
+            {(content?.testimonials || [{}, {}]).map((testimonial: any, i: number) => (
+                <div key={i} className="bg-gray-50/50 dark:bg-zinc-900/80 p-6 border border-gray-100/80 dark:border-zinc-800 rounded-lg">
+                    <p className="italic mb-4">"{testimonial.quote || "This is a fantastic testimonial."}"</p>
+                    <p className="font-semibold">{testimonial.name || "Client Name"}</p>
+                    <p className="text-sm text-gray-500">{testimonial.company || "Company Inc."}</p>
+                </div>
+            ))}
+        </div>
+    </Section>
+);
+
+const AboutTextImage: React.FC<{ content: any }> = ({ content }) => (
+    <Section title={content?.title || "About Me"}>
+        <div className="flex flex-col md:flex-row items-center gap-12">
+            <div className="md:w-1/2">
+                <img src={content?.image_url || "https://placehold.co/500x500"} alt="About" className="rounded-lg shadow-md w-full h-auto" />
+            </div>
+            <div className="md:w-1/2 space-y-4">
+                <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{content?.paragraph1 || "First paragraph of about section."}</p>
+                <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{content?.paragraph2 || "Second paragraph of about section."}</p>
+            </div>
+        </div>
+    </Section>
+);
+
+const PricingTiered: React.FC<{ content: any }> = ({ content }) => (
+    <Section title={content?.title || "Pricing"}>
+        <div className="grid md:grid-cols-3 gap-6 text-center">
+            {(content?.tiers || [{}, {popular: true}, {}]).map((tier: any, i: number) => (
+                <div key={i} className={`p-8 border rounded-lg ${tier.popular ? 'border-blue-500' : 'dark:border-zinc-800'}`}>
+                    <h3 className="text-xl font-bold mb-2">{tier.name || "Tier Name"}</h3>
+                    <p className="text-4xl font-bold mb-4">${tier.price || (i+1)*29}</p>
+                    <p className="text-sm text-gray-500 mb-6">{tier.period || "/month"}</p>
+                    <ul className="space-y-3 mb-8">
+                        {(tier.features || ["Feature 1", "Feature 2", "Feature 3"]).map((f: string, j: number) => <li key={j}>{f}</li>)}
+                    </ul>
+                    <a href={tier.cta_link || '#'} className={`px-6 py-2 font-semibold rounded-lg ${tier.popular ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-zinc-800'}`}>
+                        {tier.cta_text || "Get Started"}
+                    </a>
+                </div>
+            ))}
+        </div>
+    </Section>
+);
+
+const TeamCards: React.FC<{ content: any }> = ({ content }) => (
+     <Section title={content?.title || "Our Team"}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+             {(content?.members || [{},{},{},{}]).map((member: any, i: number) => (
+                 <div key={i} className="text-center">
+                     <img src={member.image_url || `https://placehold.co/200x200`} className="rounded-full w-24 h-24 mx-auto mb-4" alt={member.name} />
+                     <h4 className="font-semibold">{member.name || "Team Member"}</h4>
+                     <p className="text-sm text-gray-500">{member.role || "Role"}</p>
+                 </div>
+             ))}
+        </div>
+    </Section>
+);
+
+const FooterWithLinks: React.FC<{ content: any }> = ({ content }) => (
+    <div className="py-12 border-t dark:border-zinc-800">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+             {(content?.columns || [{},{},{},{}]).map((col: any, i: number) => (
+                <div key={i}>
+                    <h4 className="font-semibold mb-3">{col.title || "Column"}</h4>
+                    <ul className="space-y-2">
+                        {(col.links || [{text: 'Link 1', href: '#'}]).map((link: any, j: number) => (
+                           <li key={j}><a href={link.href} className="text-gray-500 hover:text-gray-900">{link.text}</a></li>
+                        ))}
+                    </ul>
+                </div>
+             ))}
+        </div>
+        <p className="text-center text-sm text-gray-400 mt-12">&copy; {new Date().getFullYear()} {content?.copyright || "Your Company"}</p>
+    </div>
+);
+
+const FooterNewsletter: React.FC<{ content: any }> = ({ content }) => (
+    <div className="py-12 text-center border-t dark:border-zinc-800">
+        <h3 className="text-xl font-bold mb-2">{content?.title || "Join our Newsletter"}</h3>
+        <p className="text-gray-500 mb-6">{content?.subtitle || "Stay up to date with our latest news."}</p>
+        <form className="max-w-sm mx-auto flex gap-2">
+            <input type="email" placeholder="Enter your email" className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" />
+            <button type="submit" className="bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-blue-700">Subscribe</button>
+        </form>
+         <p className="text-center text-sm text-gray-400 mt-12">&copy; {new Date().getFullYear()} {content?.copyright || "Your Company"}</p>
+    </div>
+);
 
 
 // --- UI COMPONENTS ---
@@ -190,17 +324,29 @@ const Footer: React.FC<{ theme: Theme; setTheme: (theme: Theme) => void }> = ({ 
 );
 
 
-// --- PAGES ---
+// --- PAGES & CONFIG ---
 
-const ALL_SECTIONS: Record<string, {name: string, component: React.FC<any>}> = {
-    'recent_projects': { name: 'Recent Projects', component: RecentProjects },
-    'work_experience': { name: 'Work Experience', component: WorkExperience },
-    'blog': { name: 'Blog', component: Blog },
-    'connect': { name: 'Connect', component: Connect },
+const ALL_SECTIONS: Record<string, {name: string, component: React.FC<any>, editable: boolean, defaultContent?: any }> = {
+    'header': { name: 'Header', component: Header, editable: false },
+    'recent_projects': { name: 'Recent Projects', component: RecentProjects, editable: false },
+    'work_experience': { name: 'Work Experience', component: WorkExperience, editable: false },
+    'blog': { name: 'Blog', component: Blog, editable: false },
+    'connect': { name: 'Connect', component: Connect, editable: false },
+    // New editable sections
+    'hero_centered': { name: 'Hero (Centered)', component: HeroCentered, editable: true, defaultContent: { headline: 'Centered Hero Headline', subtext: 'A compelling subtext goes here.', cta_text: 'Get Started', cta_link: '#' } },
+    'hero_split': { name: 'Hero (Split)', component: HeroSplit, editable: true, defaultContent: { headline: 'Split Hero Headline', subtext: 'A compelling subtext.', cta_text: 'Learn More', cta_link: '#', image_url: 'https://placehold.co/600x400' } },
+    'features_grid': { name: 'Features Grid', component: FeaturesGrid, editable: true, defaultContent: { title: 'Our Features', features: [{icon: '✨', name: 'Feature One', description: 'Description one.'}, {icon: '🚀', name: 'Feature Two', description: 'Description two.'}, {icon: '💡', name: 'Feature Three', description: 'Description three.'}] } },
+    'about_text_image': { name: 'About (Text & Image)', component: AboutTextImage, editable: true, defaultContent: { title: 'About Us', image_url: 'https://placehold.co/500x500', paragraph1: 'Lorem ipsum dolor sit amet.', paragraph2: 'Consectetur adipiscing elit.' } },
+    'testimonials_cards': { name: 'Testimonials', component: TestimonialsCards, editable: true, defaultContent: { title: 'What Our Clients Say', testimonials: [{quote: 'Amazing work!', name: 'Jane Doe', company: 'Acme Inc.'}, {quote: 'Highly recommended.', name: 'John Smith', company: 'Beta Corp.'}] } },
+    'team_cards': { name: 'Team Cards', component: TeamCards, editable: true, defaultContent: { title: 'Our Team', members: [{name: 'Person 1', role: 'CEO', image_url: 'https://placehold.co/200x200'}, {name: 'Person 2', role: 'CTO', image_url: 'https://placehold.co/200x200'}] } },
+    'pricing_tiered': { name: 'Pricing Table', component: PricingTiered, editable: true, defaultContent: { title: 'Our Plans', tiers: [{name: 'Basic', price: 29, period: '/mo', features: ['Feature A', 'Feature B'], cta_text: 'Choose Plan'}, {name: 'Pro', price: 99, period: '/mo', features: ['Feature A', 'Feature B', 'Feature C'], cta_text: 'Choose Plan', popular: true}] } },
+    'footer_links': { name: 'Footer (with Links)', component: FooterWithLinks, editable: true, defaultContent: { copyright: 'Your Company Name', columns: [{title: 'Product', links: [{text: 'Pricing', href: '#'}, {text: 'Features', href: '#'}] }] } },
+    'footer_newsletter': { name: 'Footer (Newsletter)', component: FooterNewsletter, editable: true, defaultContent: { title: 'Join Our Newsletter', subtitle: 'Get the latest updates.', copyright: 'Your Company Name' } },
 };
 
 const HomePage: React.FC<{ layout: SiteLayoutSection[], posts: BlogPost[], projects: Project[] }> = ({ layout, posts, projects }) => {
     const componentProps = {
+        'header': { name, role, bio },
         'recent_projects': { projects: projects.filter(p => p.is_featured) },
         'work_experience': { experiences: workExperience },
         'blog': { posts },
@@ -210,12 +356,15 @@ const HomePage: React.FC<{ layout: SiteLayoutSection[], posts: BlogPost[], proje
     return (
         <main className="max-w-3xl mx-auto px-6 py-20 md:py-28">
             <div className="space-y-20">
-                <Header name={name} role={role} bio={bio} />
                 {layout.map(section => {
-                    const SectionComponent = ALL_SECTIONS[section.section_id]?.component;
-                    if (!SectionComponent) return null;
-                    const props = componentProps[section.section_id as keyof typeof componentProps];
-                    return <SectionComponent key={section.id} {...props} />;
+                    const sectionConfig = ALL_SECTIONS[section.section_id];
+                    if (!sectionConfig) return null;
+                    
+                    const props = sectionConfig.editable 
+                        ? { content: section.content } 
+                        : componentProps[section.section_id as keyof typeof componentProps];
+
+                    return <sectionConfig.component key={section.id} {...props} />;
                 })}
             </div>
         </main>
@@ -371,7 +520,7 @@ const LoginPage: React.FC<{ onLogin: (success: boolean) => void }> = ({ onLogin 
 };
 
 // --- ADMIN PAGE & COMPONENTS ---
-type ModalType = 'create-project' | 'edit-project' | 'create-blog' | 'edit-blog' | null;
+type ModalType = 'create-project' | 'edit-project' | 'create-blog' | 'edit-blog' | 'edit-section' | null;
 type ProjectFormData = Omit<Project, 'id' | 'created_at' | 'is_featured' | 'tech_stack'> & { tech_stack: string };
 type BlogFormData = Omit<BlogPost, 'id' | 'created_at' | 'slug' | 'is_featured'>;
 
@@ -776,6 +925,55 @@ const AdminPage: React.FC<{
     );
 };
 
+const ContentEditModal: React.FC<{
+    section: SiteLayoutSection;
+    onClose: () => void;
+    onContentChange: (newContent: any) => void;
+}> = ({ section, onClose, onContentChange }) => {
+    const sectionConfig = ALL_SECTIONS[section.section_id];
+    const [formData, setFormData] = useState(section.content || {});
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = e.target;
+        const newFormData = { ...formData, [name]: value };
+        setFormData(newFormData);
+        onContentChange(newFormData);
+    };
+    
+    // A simple form generator based on field names
+    const renderField = (key: string, value: any) => {
+        const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        if (typeof value === 'string') {
+            if (value.length > 80 || key.includes('text') || key.includes('paragraph')) {
+                return (
+                    <div key={key}>
+                        <label className="block text-sm font-medium mb-1">{label}</label>
+                        <textarea name={key} value={value} onChange={handleChange} className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700 h-24" />
+                    </div>
+                );
+            }
+            return (
+                <div key={key}>
+                    <label className="block text-sm font-medium mb-1">{label}</label>
+                    <input name={key} value={value} onChange={handleChange} className="w-full p-2 rounded bg-white dark:bg-zinc-800 border dark:border-zinc-700" />
+                </div>
+            );
+        }
+        return null;
+    }
+
+    return (
+        <Modal isOpen={true} onClose={onClose} title={`Editing: ${sectionConfig.name}`}>
+            <div className="space-y-4">
+                {Object.entries(formData).map(([key, value]) => renderField(key, value))}
+                {/* Note: Editing nested objects like features/testimonials is not supported by this simple form */}
+                <button onClick={onClose} className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">Done</button>
+            </div>
+        </Modal>
+    );
+};
+
+
 const SiteEditorPage: React.FC<{
     initialLayout: SiteLayoutSection[];
     posts: BlogPost[]; 
@@ -785,6 +983,7 @@ const SiteEditorPage: React.FC<{
     const [layout, setLayout] = useState<SiteLayoutSection[]>(initialLayout);
     const [isSaving, setIsSaving] = useState(false);
     const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
+    const [editingSection, setEditingSection] = useState<SiteLayoutSection | null>(null);
 
     const moveSection = (index: number, direction: 'up' | 'down') => {
         const newLayout = [...layout];
@@ -799,11 +998,14 @@ const SiteEditorPage: React.FC<{
     };
 
     const addSection = (sectionId: string) => {
-        if (layout.find(s => s.section_id === sectionId)) return; // Avoid duplicates
+        const sectionConfig = ALL_SECTIONS[sectionId];
+        if (!sectionConfig) return;
+        
         const newSection: SiteLayoutSection = {
-            id: Date.now(), // Temporary ID
+            id: Date.now(),
             section_id: sectionId,
             sort_order: layout.length,
+            content: sectionConfig.defaultContent || {}
         };
         setLayout(prev => [...prev, newSection]);
     };
@@ -822,7 +1024,17 @@ const SiteEditorPage: React.FC<{
         setTimeout(() => setSaveStatus(null), 3000);
     };
 
-    const availableSections = Object.keys(ALL_SECTIONS).filter(id => !layout.some(s => s.section_id === id));
+    const handleContentChange = (id: number, newContent: any) => {
+        setLayout(prevLayout => prevLayout.map(sec => 
+            sec.id === id ? { ...sec, content: newContent } : sec
+        ));
+    };
+
+    const availableSections = Object.keys(ALL_SECTIONS).filter(id => {
+        // Allow multiple footers, but not multiple of other types for simplicity
+        if (id.startsWith('footer_')) return true;
+        return !layout.some(s => s.section_id === id);
+    });
     
     return (
         <div className="flex flex-col h-screen bg-gray-100 dark:bg-zinc-950">
@@ -853,16 +1065,23 @@ const SiteEditorPage: React.FC<{
                 <aside className="w-1/3 max-w-sm flex-shrink-0 bg-white dark:bg-zinc-900 p-4 overflow-y-auto border-r dark:border-zinc-800">
                     <h2 className="text-lg font-semibold mb-4 dark:text-white">Active Sections</h2>
                     <div className="space-y-2">
-                        {layout.map((section, index) => (
-                            <div key={section.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-zinc-800 rounded-md">
-                                <span className="font-medium dark:text-gray-200">{ALL_SECTIONS[section.section_id]?.name || section.section_id}</span>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => moveSection(index, 'up')} disabled={index === 0} className="disabled:opacity-30">↑</button>
-                                    <button onClick={() => moveSection(index, 'down')} disabled={index === layout.length - 1} className="disabled:opacity-30">↓</button>
-                                    <button onClick={() => removeSection(index)} className="text-red-500">✕</button>
+                        {layout.map((section, index) => {
+                            const sectionConfig = ALL_SECTIONS[section.section_id];
+                            return (
+                            <div key={section.id} className="p-3 bg-gray-50 dark:bg-zinc-800 rounded-md">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-medium dark:text-gray-200">{sectionConfig?.name || section.section_id}</span>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => moveSection(index, 'up')} disabled={index === 0} className="disabled:opacity-30">↑</button>
+                                        <button onClick={() => moveSection(index, 'down')} disabled={index === layout.length - 1} className="disabled:opacity-30">↓</button>
+                                        <button onClick={() => removeSection(index)} className="text-red-500">✕</button>
+                                    </div>
                                 </div>
+                                {sectionConfig?.editable && (
+                                     <button onClick={() => setEditingSection(section)} className="text-sm font-medium text-blue-600 hover:underline mt-2">Edit Content</button>
+                                )}
                             </div>
-                        ))}
+                        )})}
                     </div>
                      <h2 className="text-lg font-semibold mt-6 mb-4 dark:text-white">Add a Section</h2>
                      <div className="space-y-2">
@@ -883,6 +1102,13 @@ const SiteEditorPage: React.FC<{
                    <HomePage layout={layout} posts={posts} projects={projects} />
                 </main>
             </div>
+            {editingSection && (
+                <ContentEditModal 
+                    section={editingSection} 
+                    onClose={() => setEditingSection(null)} 
+                    onContentChange={(newContent) => handleContentChange(editingSection.id, newContent)}
+                />
+            )}
         </div>
     );
 };
@@ -917,20 +1143,19 @@ const App: React.FC = () => {
     }, []);
     
     const handleSaveLayout = async (newLayout: SiteLayoutSection[]) => {
-        // 1. Delete old layout
-        const { error: deleteError } = await supabase.from('site_layout').delete().neq('id', 0); // trick to delete all rows
+        const { error: deleteError } = await supabase.from('site_layout').delete().neq('id', -1);
         if (deleteError) throw deleteError;
         
-        // 2. Insert new layout
         const layoutToInsert = newLayout.map((section, index) => ({
             section_id: section.section_id,
-            sort_order: index
+            sort_order: index,
+            content: section.content
         }));
         
         const { error: insertError } = await supabase.from('site_layout').insert(layoutToInsert);
         if (insertError) throw insertError;
         
-        await refreshLayout(); // Refresh layout state after saving
+        await refreshLayout();
     };
 
     useEffect(() => {
@@ -940,7 +1165,6 @@ const App: React.FC = () => {
                 setIsAuthenticated(true);
             }
 
-            // Log a new page visit on every app load for analytics.
             supabase.from('page_visits').insert({}).then(({error}) => {
                 if (error) console.error("Error logging page visit:", error);
             });
