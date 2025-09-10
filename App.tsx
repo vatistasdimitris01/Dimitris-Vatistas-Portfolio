@@ -50,6 +50,13 @@ type BlogPost = {
 
 type Theme = 'light' | 'dark' | 'system';
 
+type SiteLayoutSection = {
+    id: number;
+    section_id: string;
+    sort_order: number;
+};
+
+
 const socialLinks = [
     { name: "X", url: "https://x.com/vatistasdim", icon: XIcon },
     { name: "Instagram", url: "https://www.instagram.com/vatistasdimitris/", icon: InstagramIcon },
@@ -94,7 +101,7 @@ const RecentProjects: React.FC<{ projects: Project[] }> = ({ projects }) => (
                             <h3 className="font-semibold text-gray-800 dark:text-gray-200 group-hover:text-black dark:group-hover:text-white">
                                 {project.title}
                             </h3>
-                            <p className="text-gray-500 dark:text-gray-400 mt-2">{project.outcome?.substring(0, 100)}...</p>
+                            <p className="text-gray-500 dark:text-gray-400 mt-2">{project.content?.substring(0, 100)}...</p>
                         </div>
                          <div className="flex items-center gap-2 mt-1 flex-shrink-0">
                              <span className="relative flex h-2.5 w-2.5">
@@ -185,17 +192,35 @@ const Footer: React.FC<{ theme: Theme; setTheme: (theme: Theme) => void }> = ({ 
 
 // --- PAGES ---
 
-const HomePage: React.FC<{ posts: BlogPost[], projects: Project[] }> = ({ posts, projects }) => (
-    <main className="max-w-3xl mx-auto px-6 py-20 md:py-28">
-        <div className="space-y-20">
-            <Header name={name} role={role} bio={bio} />
-            <RecentProjects projects={projects} />
-            <WorkExperience experiences={workExperience} />
-            <Blog posts={posts} />
-            <Connect links={socialLinks} />
-        </div>
-    </main>
-);
+const ALL_SECTIONS: Record<string, {name: string, component: React.FC<any>}> = {
+    'recent_projects': { name: 'Recent Projects', component: RecentProjects },
+    'work_experience': { name: 'Work Experience', component: WorkExperience },
+    'blog': { name: 'Blog', component: Blog },
+    'connect': { name: 'Connect', component: Connect },
+};
+
+const HomePage: React.FC<{ layout: SiteLayoutSection[], posts: BlogPost[], projects: Project[] }> = ({ layout, posts, projects }) => {
+    const componentProps = {
+        'recent_projects': { projects: projects.filter(p => p.is_featured) },
+        'work_experience': { experiences: workExperience },
+        'blog': { posts },
+        'connect': { links: socialLinks },
+    };
+    
+    return (
+        <main className="max-w-3xl mx-auto px-6 py-20 md:py-28">
+            <div className="space-y-20">
+                <Header name={name} role={role} bio={bio} />
+                {layout.map(section => {
+                    const SectionComponent = ALL_SECTIONS[section.section_id]?.component;
+                    if (!SectionComponent) return null;
+                    const props = componentProps[section.section_id as keyof typeof componentProps];
+                    return <SectionComponent key={section.id} {...props} />;
+                })}
+            </div>
+        </main>
+    );
+};
 
 const PageLayout: React.FC<{children: React.ReactNode}> = ({ children }) => (
     <main className="max-w-3xl mx-auto px-6 py-16 md:py-24">{children}</main>
@@ -375,6 +400,15 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
         </div>
     );
 };
+
+const AdminCard: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ title, children, className = '' }) => (
+    <div className={`bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg shadow-sm ${className}`}>
+        <div className="p-4 border-b dark:border-zinc-800">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+        </div>
+        <div className="p-4">{children}</div>
+    </div>
+);
 
 const AdminPage: React.FC<{
     posts: BlogPost[]; refreshPosts: () => void;
@@ -608,15 +642,6 @@ const AdminPage: React.FC<{
         );
     };
     
-    const AdminCard: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ title, children, className = '' }) => (
-        <div className={`bg-white dark:bg-zinc-900 border dark:border-zinc-800 rounded-lg shadow-sm ${className}`}>
-            <div className="p-4 border-b dark:border-zinc-800">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
-            </div>
-            <div className="p-4">{children}</div>
-        </div>
-    );
-    
     return (
         <div className="min-h-screen bg-gray-50 dark:bg-zinc-950">
             <header className="bg-white dark:bg-zinc-900 border-b dark:border-zinc-800 p-4 sm:px-6 lg:px-8">
@@ -640,6 +665,14 @@ const AdminPage: React.FC<{
                             <button onClick={() => setActiveModal('create-project')} className="w-full text-left p-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 rounded-md transition-colors">Create New Project</button>
                             <button onClick={() => setActiveModal('create-blog')} className="w-full text-left p-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 rounded-md transition-colors">Create New Blog Post</button>
                         </div>
+                    </AdminCard>
+                     <AdminCard title="Site Editor">
+                         <div className="space-y-3">
+                            <a href="/#/editor" className="block w-full text-left p-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 rounded-md transition-colors">
+                                Edit Homepage Layout
+                            </a>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 px-1">Add, remove, and reorder the sections on your main page.</p>
+                         </div>
                     </AdminCard>
                 </div>
 
@@ -743,12 +776,124 @@ const AdminPage: React.FC<{
     );
 };
 
+const SiteEditorPage: React.FC<{
+    initialLayout: SiteLayoutSection[];
+    posts: BlogPost[]; 
+    projects: Project[];
+    onSave: (newLayout: SiteLayoutSection[]) => Promise<void>;
+}> = ({ initialLayout, posts, projects, onSave }) => {
+    const [layout, setLayout] = useState<SiteLayoutSection[]>(initialLayout);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<'success' | 'error' | null>(null);
+
+    const moveSection = (index: number, direction: 'up' | 'down') => {
+        const newLayout = [...layout];
+        const targetIndex = direction === 'up' ? index - 1 : index + 1;
+        if (targetIndex < 0 || targetIndex >= newLayout.length) return;
+        [newLayout[index], newLayout[targetIndex]] = [newLayout[targetIndex], newLayout[index]];
+        setLayout(newLayout);
+    };
+
+    const removeSection = (index: number) => {
+        setLayout(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const addSection = (sectionId: string) => {
+        if (layout.find(s => s.section_id === sectionId)) return; // Avoid duplicates
+        const newSection: SiteLayoutSection = {
+            id: Date.now(), // Temporary ID
+            section_id: sectionId,
+            sort_order: layout.length,
+        };
+        setLayout(prev => [...prev, newSection]);
+    };
+
+    const handleSaveLayout = async () => {
+        setIsSaving(true);
+        setSaveStatus(null);
+        try {
+            await onSave(layout);
+            setSaveStatus('success');
+        } catch (error) {
+            setSaveStatus('error');
+            console.error("Failed to save layout:", error);
+        }
+        setIsSaving(false);
+        setTimeout(() => setSaveStatus(null), 3000);
+    };
+
+    const availableSections = Object.keys(ALL_SECTIONS).filter(id => !layout.some(s => s.section_id === id));
+    
+    return (
+        <div className="flex flex-col h-screen bg-gray-100 dark:bg-zinc-950">
+            <header className="flex-shrink-0 bg-white dark:bg-zinc-900 border-b dark:border-zinc-800 p-4 flex justify-between items-center">
+                <div>
+                    <h1 className="text-xl font-semibold dark:text-white">Site Editor</h1>
+                    <p className="text-sm text-gray-500">Manage your homepage layout.</p>
+                </div>
+                <div className="flex items-center gap-4">
+                    <a href="/#/admin" className="text-sm font-medium text-blue-600 hover:underline">← Back to Admin</a>
+                    <button
+                        onClick={handleSaveLayout}
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors text-sm disabled:bg-blue-400"
+                    >
+                        {isSaving ? 'Saving...' : 'Save Layout'}
+                    </button>
+                </div>
+            </header>
+             {saveStatus && (
+                <div className={`p-2 text-center text-sm ${saveStatus === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {saveStatus === 'success' ? 'Layout saved successfully!' : 'Failed to save layout.'}
+                </div>
+             )}
+
+            <div className="flex-grow flex overflow-hidden">
+                {/* Left Panel - Controls */}
+                <aside className="w-1/3 max-w-sm flex-shrink-0 bg-white dark:bg-zinc-900 p-4 overflow-y-auto border-r dark:border-zinc-800">
+                    <h2 className="text-lg font-semibold mb-4 dark:text-white">Active Sections</h2>
+                    <div className="space-y-2">
+                        {layout.map((section, index) => (
+                            <div key={section.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-zinc-800 rounded-md">
+                                <span className="font-medium dark:text-gray-200">{ALL_SECTIONS[section.section_id]?.name || section.section_id}</span>
+                                <div className="flex items-center gap-2">
+                                    <button onClick={() => moveSection(index, 'up')} disabled={index === 0} className="disabled:opacity-30">↑</button>
+                                    <button onClick={() => moveSection(index, 'down')} disabled={index === layout.length - 1} className="disabled:opacity-30">↓</button>
+                                    <button onClick={() => removeSection(index)} className="text-red-500">✕</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                     <h2 className="text-lg font-semibold mt-6 mb-4 dark:text-white">Add a Section</h2>
+                     <div className="space-y-2">
+                        {availableSections.length > 0 ? (
+                            availableSections.map(id => (
+                                <button key={id} onClick={() => addSection(id)} className="w-full text-left p-3 bg-gray-100 hover:bg-gray-200 dark:bg-zinc-800/50 dark:hover:bg-zinc-800 rounded-md transition-colors">
+                                    + {ALL_SECTIONS[id]?.name}
+                                </button>
+                            ))
+                        ) : (
+                            <p className="text-sm text-gray-500">All available sections are in use.</p>
+                        )}
+                    </div>
+                </aside>
+                
+                {/* Right Panel - Preview */}
+                <main className="flex-grow overflow-y-auto bg-white dark:bg-zinc-950">
+                   <HomePage layout={layout} posts={posts} projects={projects} />
+                </main>
+            </div>
+        </div>
+    );
+};
+
 
 // --- MAIN APP ---
 const App: React.FC = () => {
     const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system');
     const [posts, setPosts] = useState<BlogPost[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
+    const [siteLayout, setSiteLayout] = useState<SiteLayoutSection[]>([]);
     const [currentRoute, setCurrentRoute] = useState<string>(window.location.hash || '#/');
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -764,6 +909,29 @@ const App: React.FC = () => {
         if (error) console.error("Error fetching projects:", error);
         else setProjects(data || []);
     }, []);
+    
+    const refreshLayout = useCallback(async () => {
+        const { data, error } = await supabase.from('site_layout').select('*').order('sort_order', { ascending: true });
+        if (error) console.error("Error fetching site layout:", error);
+        else setSiteLayout(data || []);
+    }, []);
+    
+    const handleSaveLayout = async (newLayout: SiteLayoutSection[]) => {
+        // 1. Delete old layout
+        const { error: deleteError } = await supabase.from('site_layout').delete().neq('id', 0); // trick to delete all rows
+        if (deleteError) throw deleteError;
+        
+        // 2. Insert new layout
+        const layoutToInsert = newLayout.map((section, index) => ({
+            section_id: section.section_id,
+            sort_order: index
+        }));
+        
+        const { error: insertError } = await supabase.from('site_layout').insert(layoutToInsert);
+        if (insertError) throw insertError;
+        
+        await refreshLayout(); // Refresh layout state after saving
+    };
 
     useEffect(() => {
         const loadData = async () => {
@@ -773,16 +941,15 @@ const App: React.FC = () => {
             }
 
             // Log a new page visit on every app load for analytics.
-            // This runs in the background and doesn't block rendering.
             supabase.from('page_visits').insert({}).then(({error}) => {
                 if (error) console.error("Error logging page visit:", error);
             });
 
-            await Promise.all([refreshPosts(), refreshProjects()]);
+            await Promise.all([refreshPosts(), refreshProjects(), refreshLayout()]);
             setIsLoading(false);
         };
         loadData();
-    }, [refreshPosts, refreshProjects]);
+    }, [refreshPosts, refreshProjects, refreshLayout]);
 
     useEffect(() => {
         const applyTheme = () => {
@@ -840,14 +1007,19 @@ const App: React.FC = () => {
             if (!isAuthenticated) return <LoginPage onLogin={handleLogin} />;
             return <AdminPage posts={posts} refreshPosts={refreshPosts} projects={projects} refreshProjects={refreshProjects} />;
         }
+        
+        if (currentRoute === '#/editor') {
+            if (!isAuthenticated) return <LoginPage onLogin={handleLogin} />;
+            return <SiteEditorPage initialLayout={siteLayout} posts={posts} projects={projects} onSave={handleSaveLayout} />;
+        }
 
-        return <HomePage posts={posts} projects={projects.filter(p => p.is_featured)} />;
+        return <HomePage layout={siteLayout} posts={posts} projects={projects} />;
     };
     
     return (
         <>
             {renderPage()}
-            {!(currentRoute === '#/admin' && !isAuthenticated) && <Footer theme={theme} setTheme={setTheme} />}
+            {!(currentRoute === '#/admin' && !isAuthenticated) && !(currentRoute === '#/editor') && <Footer theme={theme} setTheme={setTheme} />}
         </>
     );
 };
